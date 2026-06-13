@@ -11,6 +11,10 @@ from pydantic import BaseModel
 
 # ----- Profile -----
 
+class ResumeTextIn(BaseModel):
+    resume_text: str
+
+
 class ProfileCreate(BaseModel):
     raw_resume: str
 
