@@ -1,7 +1,10 @@
 """Job endpoints.
 
-Ingestion from SimplifyJobs/New-Grad-Positions, plus list/detail reads.
-Ranking against a profile is a later slice.
+Ingestion from SimplifyJobs/New-Grad-Positions, list/detail reads, and
+deterministic matching/ranking against the saved demo-user profile.
+
+NOTE: static paths like /jobs/matches/ranked are declared BEFORE the
+/jobs/{job_id} catch-all so they aren't swallowed by the int path param.
 """
 
 import requests
@@ -11,6 +14,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Job
 from ..services.job_ingestion import ingest_jobs
+from ..services import matcher
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -28,6 +32,8 @@ def _serialize(job: Job) -> dict:
     }
 
 
+# ----- Ingestion -----
+
 @router.post("/ingest/simplify")
 def ingest_simplify(db: Session = Depends(get_db)):
     """Fetch + parse + store deduplicated jobs from the SimplifyJobs README."""
@@ -43,6 +49,25 @@ def ingest_simplify(db: Session = Depends(get_db)):
     return result
 
 
+# ----- Matching / ranking (static paths first) -----
+
+@router.post("/match-all")
+def match_all_jobs(db: Session = Depends(get_db)):
+    """Score every stored job against the saved demo-user profile."""
+    try:
+        return matcher.match_all(db)
+    except ValueError as exc:  # no profile saved yet
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/matches/ranked")
+def list_ranked_matches(limit: int = 100, db: Session = Depends(get_db)):
+    """Return jobs with match scores, highest first."""
+    return matcher.ranked_matches(db, limit=limit)
+
+
+# ----- Reads -----
+
 @router.get("")
 def list_jobs(limit: int = 100, offset: int = 0, db: Session = Depends(get_db)):
     """Return stored jobs as a clean JSON array (newest first)."""
@@ -54,6 +79,17 @@ def list_jobs(limit: int = 100, offset: int = 0, db: Session = Depends(get_db)):
         .all()
     )
     return [_serialize(job) for job in jobs]
+
+
+@router.post("/{job_id}/match")
+def match_one_job(job_id: int, db: Session = Depends(get_db)):
+    """Score a single job against the saved demo-user profile (upsert)."""
+    try:
+        return matcher.match_job(db, job_id)
+    except ValueError as exc:  # no profile saved yet
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LookupError as exc:  # job not found
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/{job_id}")
