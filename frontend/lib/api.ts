@@ -198,6 +198,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ resume_text }),
     }),
+  uploadResumeFile: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    // Empty headers => browser sets the multipart boundary itself (don't force
+    // application/json here, or FastAPI can't parse the upload).
+    return request<Profile>("/profile/resume-file", {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+  },
 
   // Jobs
   ingestJobs: () =>

@@ -6,13 +6,14 @@ the first time and updates it on every subsequent paste (no duplicates).
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import DEMO_USER_ID, Profile
 from ..schemas import ResumeTextIn
 from ..services.resume_parser import parse_resume
+from ..services.resume_file import ResumeFileError, extract_text_from_file
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -30,10 +31,13 @@ def _serialize(profile: Profile) -> dict:
     }
 
 
-@router.post("/resume-text")
-def save_resume_text(payload: ResumeTextIn, db: Session = Depends(get_db)):
-    """Save/replace the demo user's resume and extract a simple profile."""
-    resume_text = payload.resume_text.strip()
+def _save_profile_from_text(db: Session, resume_text: str) -> dict:
+    """Parse resume text and upsert the demo-user profile.
+
+    Shared by both the paste-text and file-upload endpoints so parsing/upsert
+    logic lives in exactly one place. Raises HTTP 400 on empty text.
+    """
+    resume_text = (resume_text or "").strip()
     if not resume_text:
         raise HTTPException(status_code=400, detail="resume_text must not be empty")
 
@@ -52,6 +56,34 @@ def save_resume_text(payload: ResumeTextIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(profile)
     return _serialize(profile)
+
+
+@router.post("/resume-text")
+def save_resume_text(payload: ResumeTextIn, db: Session = Depends(get_db)):
+    """Save/replace the demo user's resume and extract a simple profile."""
+    return _save_profile_from_text(db, payload.resume_text)
+
+
+@router.post("/resume-file")
+async def save_resume_file(
+    file: UploadFile | None = None, db: Session = Depends(get_db)
+):
+    """Upload a .pdf or .docx resume, extract its text locally, then reuse the
+    exact same parse/upsert path as /resume-text.
+
+    Errors (all HTTP 400 with a clear message): no file, unsupported type,
+    oversized file, unreadable PDF/DOCX, or no extractable text.
+    """
+    if file is None:
+        raise HTTPException(status_code=400, detail="No file provided.")
+
+    data = await file.read()
+    try:
+        resume_text = extract_text_from_file(file.filename, data)
+    except ResumeFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _save_profile_from_text(db, resume_text)
 
 
 @router.get("")
