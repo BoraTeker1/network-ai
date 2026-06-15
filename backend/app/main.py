@@ -6,11 +6,13 @@ Local MVP backend skeleton. No auth, no LLM calls yet.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .db import Base, engine
-from .routers import jobs, messages, profile
+from .db import Base, engine, run_lightweight_migrations
+from .routers import demo, insights, jobs, messages, profile
 
 # Create tables on startup (simple for MVP; swap for migrations later).
 Base.metadata.create_all(bind=engine)
+# Add any additive columns to pre-existing tables (idempotent).
+run_lightweight_migrations()
 
 app = FastAPI(title="Network AI", version="0.1.0")
 
@@ -26,6 +28,8 @@ app.add_middleware(
 app.include_router(profile.router)
 app.include_router(jobs.router)
 app.include_router(messages.router)
+app.include_router(insights.router)
+app.include_router(demo.router)
 
 
 @app.get("/health")

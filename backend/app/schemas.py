@@ -75,6 +75,26 @@ class MessageCreate(BaseModel):
     message_type: str = "connection_request"
 
 
+class MessageGenerateIn(BaseModel):
+    job_id: int
+    contact_name: Optional[str] = None
+    contact_title: Optional[str] = None
+
+
+class MessagePatch(BaseModel):
+    draft_text: str
+
+
+class OutcomeIn(BaseModel):
+    outcome: str
+    note: Optional[str] = None
+
+
+class FollowUpIn(BaseModel):
+    status: str                       # one of FOLLOW_UP_STATUSES
+    due_date: Optional[str] = None    # ISO date string (YYYY-MM-DD), optional
+
+
 class MessageUpdate(BaseModel):
     content: Optional[str] = None
     status: Optional[str] = None

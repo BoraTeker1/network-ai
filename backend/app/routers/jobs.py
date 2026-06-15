@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Job
 from ..services.job_ingestion import ingest_jobs
-from ..services import matcher
+from ..services import matcher, strategy
+from ..services.contact_search import contact_searches_for_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -90,6 +91,40 @@ def match_one_job(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(exc))
     except LookupError as exc:  # job not found
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/{job_id}/contact-searches")
+def job_contact_searches(job_id: int, db: Session = Depends(get_db)):
+    """Manual LinkedIn/Google contact-search suggestions for a job's company."""
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    if not job.company:
+        raise HTTPException(
+            status_code=404, detail=f"Job {job_id} has no company to search for"
+        )
+    return contact_searches_for_job(job.company, job.title)
+
+
+@router.get("/{job_id}/strategy")
+def job_strategy(job_id: int, db: Session = Depends(get_db)):
+    """Deterministic outreach strategy for a job (who/how-many/tone/sequence).
+
+    Uses the job's score against the saved profile when available; falls back
+    to 0 (Poor Fit) if no profile is saved yet.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    profile = matcher.get_demo_profile(db)
+    if profile is None:
+        return strategy.outreach_strategy(0, job, 0)
+
+    result = matcher.score_job(matcher._profile_skills(profile), job)
+    return strategy.outreach_strategy(
+        result["score"], job, len(result["matched_skills"])
+    )
 
 
 @router.get("/{job_id}")

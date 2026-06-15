@@ -23,6 +23,26 @@ from .db import Base
 # No auth in v1 — every record belongs to this fake user.
 DEMO_USER_ID = "demo-user"
 
+# Real-world outreach results the user can report on a sent message.
+OUTCOMES = (
+    "connected",
+    "replied",
+    "referral_received",
+    "interview_received",
+    "ignored",
+    "rejected",
+)
+
+# Follow-up workflow states — separate from `outcome` so the CRM can nudge the
+# user to follow up without overloading the outcome vocabulary. "none" means no
+# follow-up is being tracked yet.
+FOLLOW_UP_STATUSES = (
+    "none",
+    "follow_up_needed",
+    "followed_up",
+    "no_response",
+)
+
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -95,6 +115,17 @@ class Message(Base):
 
     # Approval workflow: draft -> approved/rejected -> sent (manual).
     status = Column(String, default="draft", index=True)
+
+    # Real-world result after the user manually sent the message. One of
+    # OUTCOMES (or NULL if no outcome reported yet). This is the CRM signal
+    # that closes the loop on outreach.
+    outcome = Column(String, nullable=True, index=True)
+
+    # Lightweight follow-up tracking (additive columns — see db.py migrations).
+    # follow_up_status is one of FOLLOW_UP_STATUSES; follow_up_due_date is a
+    # plain ISO date string the user picks (kept as text for SQLite simplicity).
+    follow_up_status = Column(String, nullable=True, index=True)
+    follow_up_due_date = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
