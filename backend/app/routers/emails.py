@@ -24,7 +24,7 @@ from ..models import (
     Job,
 )
 from ..schemas import EmailDraftIn, EmailPatchIn, GmailSendIn
-from ..services import email_generator, gmail_sender, matcher
+from ..services import email_generator, gmail_sender, matcher, momentum
 
 router = APIRouter(prefix="/emails", tags=["emails"])
 
@@ -211,7 +211,16 @@ def patch_email(email_id: int, payload: EmailPatchIn, db: Session = Depends(get_
 
     db.commit()
     db.refresh(e)
-    return _serialize(e, db)
+    # Award Momentum for a reported outcome or a completed follow-up (once each).
+    event_type = None
+    if payload.outcome is not None:
+        event_type = momentum.OUTCOME_EVENT.get(payload.outcome)
+    elif payload.follow_up_status is not None:
+        event_type = momentum.FOLLOW_UP_EVENT.get(payload.follow_up_status)
+    award = momentum.award(db, "email", email_id, event_type)
+    res = _serialize(e, db)
+    res["momentum"] = award
+    return res
 
 
 # ----- Approval workflow (explicit, manual) -----
@@ -221,7 +230,10 @@ def _set_status(db: Session, email_id: int, status: str) -> dict:
     e.status = status
     db.commit()
     db.refresh(e)
-    return _serialize(e, db)
+    award = momentum.award(db, "email", email_id, momentum.STATUS_EVENT.get(status))
+    res = _serialize(e, db)
+    res["momentum"] = award
+    return res
 
 
 @router.post("/{email_id}/approve")

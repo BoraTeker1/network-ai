@@ -97,6 +97,30 @@ export type Checklist = {
   total: number;
 };
 
+// ----- Momentum (Vibe Mode gamification) -----
+
+export type MomentumAward = {
+  event_type: string;
+  points: number;
+  label: string;
+  celebration: "big" | "medium" | "small" | "none";
+  message: string;
+};
+
+export type MomentumWin = {
+  event_type: string;
+  label: string;
+  points: number;
+  created_at: string | null;
+};
+
+export type MomentumSummary = {
+  points_today: number;
+  total_points: number;
+  streak: number;
+  recent_wins: MomentumWin[];
+};
+
 export type Message = {
   id: number;
   job_id: number | null;
@@ -111,6 +135,8 @@ export type Message = {
   follow_up_due_date: string | null;
   char_count: number;
   checklist: Checklist;
+  // Present only on action responses (approve/copy/sent/outcome/follow-up).
+  momentum?: MomentumAward | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -229,6 +255,8 @@ export type EmailDraft = {
   why_safe: string | null;
   suggested_next_step: string | null;
   llm_used: boolean;
+  // Present only on action responses (approve/copy/sent/outcome/follow-up).
+  momentum?: MomentumAward | null;
   status: string;
   outcome: string | null;
   follow_up_status: string | null;
@@ -399,6 +427,9 @@ export const api = {
   // Insights / dashboard
   getStats: () => request<DashboardStats>("/stats"),
   getOutcomes: () => request<OutcomesResponse>("/outcomes"),
+
+  // Momentum (Vibe Mode gamification)
+  getMomentum: () => request<MomentumSummary>("/momentum/summary"),
 
   // Goals
   getGoals: () => request<Goal[]>("/goals"),

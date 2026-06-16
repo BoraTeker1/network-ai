@@ -71,6 +71,21 @@ FOLLOW_UP_STATUSES = (
     "no_response",
 )
 
+# Momentum (Vibe Mode gamification). Points reward *quality* progress — real
+# milestones the user manually confirms — never volume, bulk, or scraping.
+# "tracked_no_points" lets a neutral outcome (ignored/rejected/connected) be
+# logged with zero points and zero shame.
+MOMENTUM_EVENT_TYPES = (
+    "draft_approved",
+    "copied",
+    "sent_manual",
+    "follow_up_completed",
+    "reply_received",
+    "referral_received",
+    "interview_received",
+    "tracked_no_points",
+)
+
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -262,3 +277,30 @@ class EmailDraft(Base):
     job = relationship("Job")
     contact = relationship("Contact")
     goal = relationship("Goal")
+
+
+class MomentumEvent(Base):
+    """A single awarded Momentum event (Vibe Mode gamification).
+
+    Each (subject_type, subject_id, event_type) can be awarded only once — the
+    unique constraint prevents double-counting when the user clicks the same
+    outcome twice. Points reward confirmed, quality progress, never volume."""
+
+    __tablename__ = "momentum_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "subject_type", "subject_id", "event_type", name="uq_momentum_once"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, default=DEMO_USER_ID)
+
+    # What the event was awarded for, e.g. ("message", 12) or ("email", 3).
+    subject_type = Column(String, index=True, nullable=True)
+    subject_id = Column(Integer, index=True, nullable=True)
+
+    event_type = Column(String, index=True)   # one of MOMENTUM_EVENT_TYPES
+    points = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

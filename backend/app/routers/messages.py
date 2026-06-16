@@ -21,7 +21,7 @@ from ..models import (
     Profile,
 )
 from ..schemas import FollowUpIn, MessageGenerateIn, MessagePatch, OutcomeIn
-from ..services import message_generator
+from ..services import message_generator, momentum
 from ..services.matcher import get_demo_profile
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -92,7 +92,12 @@ def _set_status(db: Session, message_id: int, status: str, event_type: str) -> d
     _log_event(db, message_id, event_type)
     db.commit()
     db.refresh(msg)
-    return _serialize(msg, _demo_skills(db))
+    # Award Momentum for real progress (approve/copy/manual-send). Reject earns
+    # nothing — STATUS_EVENT has no mapping for it, so award() returns None.
+    award = momentum.award(db, "message", message_id, momentum.STATUS_EVENT.get(status))
+    res = _serialize(msg, _demo_skills(db))
+    res["momentum"] = award
+    return res
 
 
 # ----- Generation -----
@@ -213,7 +218,12 @@ def set_outcome(message_id: int, payload: OutcomeIn, db: Session = Depends(get_d
     )
     db.commit()
     db.refresh(msg)
-    return _serialize(msg, _demo_skills(db))
+    award = momentum.award(
+        db, "message", message_id, momentum.OUTCOME_EVENT.get(payload.outcome)
+    )
+    res = _serialize(msg, _demo_skills(db))
+    res["momentum"] = award
+    return res
 
 
 # ----- Follow-up tracking -----
@@ -240,4 +250,9 @@ def set_follow_up(message_id: int, payload: FollowUpIn, db: Session = Depends(ge
     _log_event(db, message_id, f"follow_up:{payload.status}")
     db.commit()
     db.refresh(msg)
-    return _serialize(msg, _demo_skills(db))
+    award = momentum.award(
+        db, "message", message_id, momentum.FOLLOW_UP_EVENT.get(payload.status)
+    )
+    res = _serialize(msg, _demo_skills(db))
+    res["momentum"] = award
+    return res

@@ -13,6 +13,7 @@ import {
   WhyNotSpam,
 } from "@/components/ui";
 import VibeModeCard from "@/components/VibeModeCard";
+import MomentumCard from "@/components/MomentumCard";
 
 /** One stage of the "Your Networking Funnel" strip. */
 function FunnelStrip({ stages }: { stages: { label: string; value: number }[] }) {
@@ -180,9 +181,10 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* Vibe Mode */}
-      <div className="mt-6">
+      {/* Vibe Mode + Momentum */}
+      <div className="mt-6 grid gap-3 lg:grid-cols-2">
         <VibeModeCard />
+        <MomentumCard />
       </div>
 
       {/* Current goal summary */}

@@ -13,6 +13,7 @@ import {
   WhyNotSpam,
   PageHeader,
 } from "@/components/ui";
+import { useMomentum } from "@/components/MomentumProvider";
 
 const CONNECTION_LIMIT = 280;
 
@@ -29,6 +30,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const { celebrate } = useMomentum();
 
   async function load() {
     setLoading(true);
@@ -55,7 +57,9 @@ export default function MessagesPage() {
     setBusyId(id);
     setError(null);
     try {
-      replace(await fn());
+      const updated = await fn();
+      replace(updated);
+      celebrate(updated.momentum);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {

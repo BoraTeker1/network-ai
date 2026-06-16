@@ -13,6 +13,7 @@ import {
   FollowUpBadge,
   QualityChecklist,
 } from "@/components/ui";
+import { useMomentum } from "@/components/MomentumProvider";
 
 function defaultDueDate(): string {
   const d = new Date();
@@ -34,12 +35,15 @@ export default function EmailDraftCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gmailMsg, setGmailMsg] = useState<string | null>(null);
+  const { celebrate } = useMomentum();
 
   async function run(fn: () => Promise<EmailDraft>) {
     setBusy(true);
     setError(null);
     try {
-      onUpdated(await fn());
+      const updated = await fn();
+      onUpdated(updated);
+      celebrate(updated.momentum);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {

@@ -143,6 +143,35 @@ copy/manual-send → update outcomes) with music playing alongside.
 - **Same rules.** Vibe Mode only changes pacing and atmosphere — the philosophy
   is unchanged: no scraping, no auto-send, no bulk sending, manual approval only.
 
+### Momentum (gamification)
+
+**Momentum** is a tasteful points layer that rewards *quality* networking
+progress — never volume or spam. You earn points only for milestones you
+confirm by hand:
+
+| Action | Momentum |
+| --- | --- |
+| Draft approved | +5 |
+| Marked ready to send (copied) | +5 |
+| Sent manually | +10 |
+| Follow-up completed | +10 |
+| Reply received | +25 |
+| Referral received | +50 |
+| Interview received | +100 |
+| Ignored / rejected | +0 (logged, no shame) |
+
+- A **"Today's Momentum"** card on the dashboard shows points today, total
+  points, your day streak, and recent wins.
+- Marking an outcome shows a short celebration toast (bigger for an interview)
+  and an **optional** chime synthesized with the Web Audio API — **no
+  copyrighted or hosted audio, no autoplay** (sounds only play from your click),
+  with a **mute toggle** persisted in `localStorage`.
+- Points are stored in a `momentum_events` table and **awarded once** per
+  milestone, so clicking the same outcome twice never double-counts.
+- By design, Momentum rewards quality, not quantity: **no scraping, no
+  auto-send, no bulk sending, and replies are never auto-detected** — every
+  outcome is tracked manually.
+
 ---
 
 ## Tech stack
