@@ -9,6 +9,7 @@ const links = [
   { href: "/messages", label: "Messages" },
   { href: "/emails", label: "Emails" },
   { href: "/pipeline", label: "Pipeline" },
+  { href: "/vibe", label: "Vibe Mode" },
   { href: "/pitch", label: "Pitch" },
 ];
 

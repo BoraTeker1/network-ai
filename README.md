@@ -127,6 +127,24 @@ product features, not limitations:
 
 ---
 
+## Vibe Mode
+
+Networking outreach is boring and stressful, so **Vibe Mode** (`/vibe`, also on
+the dashboard) turns it into a focused **25-minute sprint**: pick a mood, start
+the timer, and work a short checklist (review strong matches → approve drafts →
+copy/manual-send → update outcomes) with music playing alongside.
+
+- **No hosted audio.** Network AI does **not** host or serve any music files.
+- **Third-party embeds only.** Each mood loads a Spotify / SoundCloud / YouTube
+  **embedded player** (iframe). The default playlists are curated, swappable
+  defaults — change a mood's `embedUrl` in `frontend/lib/vibe.ts`.
+- **No autoplay.** Music never starts on its own; the embedded player requires
+  you to press play.
+- **Same rules.** Vibe Mode only changes pacing and atmosphere — the philosophy
+  is unchanged: no scraping, no auto-send, no bulk sending, manual approval only.
+
+---
+
 ## Tech stack
 
 | Layer     | Technology                                            |

@@ -12,6 +12,7 @@ import {
   recommendationStyle,
   WhyNotSpam,
 } from "@/components/ui";
+import VibeModeCard from "@/components/VibeModeCard";
 
 /** One stage of the "Your Networking Funnel" strip. */
 function FunnelStrip({ stages }: { stages: { label: string; value: number }[] }) {
@@ -177,6 +178,11 @@ export default function Home() {
         >
           Open Pipeline
         </Link>
+      </div>
+
+      {/* Vibe Mode */}
+      <div className="mt-6">
+        <VibeModeCard />
       </div>
 
       {/* Current goal summary */}
