@@ -169,6 +169,19 @@ class GmailSendIn(BaseModel):
     confirm_send: bool = False
 
 
+# ----- Next Move AI -----
+
+class NextMoveIn(BaseModel):
+    # The reply the user RECEIVED, pasted in manually (never auto-read).
+    reply_text: str
+    # Optional links to existing pipeline data for richer context + a target to
+    # update when the user confirms an outcome.
+    job_id: Optional[int] = None
+    contact_id: Optional[int] = None
+    message_id: Optional[int] = None
+    email_id: Optional[int] = None
+
+
 # ----- Generic -----
 
 class StatusResponse(BaseModel):

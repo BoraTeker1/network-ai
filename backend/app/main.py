@@ -16,6 +16,7 @@ from .routers import (
     jobs,
     messages,
     momentum,
+    next_move,
     profile,
 )
 
@@ -44,6 +45,7 @@ app.include_router(goals.router)
 app.include_router(contacts.router)
 app.include_router(emails.router)
 app.include_router(momentum.router)
+app.include_router(next_move.router)
 
 
 @app.get("/health")

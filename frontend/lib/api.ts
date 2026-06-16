@@ -121,6 +121,38 @@ export type MomentumSummary = {
   recent_wins: MomentumWin[];
 };
 
+// ----- Next Move AI -----
+
+export type NextMoveTarget = {
+  type: "message" | "email" | null;
+  id: number | null;
+};
+
+export type NextMoveAnalysis = {
+  summary: string;
+  intent: string;
+  signals: string[];
+  urgency: "low" | "medium" | "high";
+  recommended_next_action: string;
+  risk_notes: string;
+  suggested_pipeline_update: string | null;
+  suggested_momentum: { event_type: string; points: number; label: string } | null;
+  drafted_email: { subject: string; body: string };
+  drafted_short_message: string;
+  quality_checklist: Checklist;
+  safety_checklist: Checklist;
+  pipeline_target: NextMoveTarget;
+  llm_used: boolean;
+};
+
+export type NextMoveInput = {
+  reply_text: string;
+  job_id?: number | null;
+  contact_id?: number | null;
+  message_id?: number | null;
+  email_id?: number | null;
+};
+
 export type Message = {
   id: number;
   job_id: number | null;
@@ -430,6 +462,13 @@ export const api = {
 
   // Momentum (Vibe Mode gamification)
   getMomentum: () => request<MomentumSummary>("/momentum/summary"),
+
+  // Next Move AI (analyze a pasted reply; never auto-reads anything)
+  analyzeNextMove: (input: NextMoveInput) =>
+    request<NextMoveAnalysis>("/next-move/analyze", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 
   // Goals
   getGoals: () => request<Goal[]>("/goals"),

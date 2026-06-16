@@ -174,6 +174,28 @@ confirm by hand:
 
 ---
 
+## Next Move AI
+
+Outreach doesn't end when you hit send — the hard part is knowing what to do
+when someone *replies*. **Next Move AI** (`/next-move`) helps with that, while
+staying strictly permission-based:
+
+- You **manually paste** the reply you received (from a recruiter, engineer,
+  alumnus, or hiring manager). The app never reads LinkedIn or your inbox.
+- The backend (OpenAI **Responses API only**, with a deterministic keyword
+  fallback) returns a **summary**, a detected **intent** (positive, neutral,
+  negative, referral possible, interview related, asks for resume, asks for work
+  authorization, needs follow-up), an **urgency**, a **recommended next move**,
+  **risk notes**, a **suggested pipeline update**, and a drafted reply in both
+  **email** and **short-message** styles — each with a quality + safety checklist.
+- You review and edit the draft, **copy** it, and send it yourself. If you linked
+  a pipeline item, one click logs the outcome (replied / referral received /
+  interview received) and awards **Momentum** once (no double-counting).
+- Guardrails are unchanged: no scraping, no browser automation, no auto-reading
+  of messages, no Gmail sending, no auto-send. AI proposes; you approve and send.
+
+---
+
 ## Tech stack
 
 | Layer     | Technology                                            |
