@@ -48,6 +48,8 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-100 text-red-700",
   copied: "bg-blue-100 text-blue-800",
   sent_manually: "bg-purple-100 text-purple-800",
+  sent_manual: "bg-purple-100 text-purple-800",
+  sent_via_gmail: "bg-purple-100 text-purple-800",
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -227,6 +229,46 @@ export function WhyNotSpam({ compact = false }: { compact?: boolean }) {
           <li key={p} className="flex items-start gap-1.5 text-xs text-slate-600">
             <span className="mt-0.5 text-green-600">✓</span>
             <span>{p}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Suggested MVP outreach limits (UI nudges — quality over volume).
+export const MAX_CONTACTS_PER_COMPANY = 3;
+export const MAX_EMAILS_PER_DAY = 5;
+
+/** Soft warning when the user exceeds suggested outreach limits. */
+export function LimitsWarning({
+  contactsForCompany,
+  emailsToday,
+}: {
+  contactsForCompany?: number;
+  emailsToday?: number;
+}) {
+  const warnings: string[] = [];
+  if ((contactsForCompany ?? 0) > MAX_CONTACTS_PER_COMPANY) {
+    warnings.push(
+      `You've added more than ${MAX_CONTACTS_PER_COMPANY} contacts for this company. Keep outreach focused — quality over volume.`
+    );
+  }
+  if ((emailsToday ?? 0) > MAX_EMAILS_PER_DAY) {
+    warnings.push(
+      `You've drafted more than ${MAX_EMAILS_PER_DAY} emails today. Slow down and personalize — this MVP is built for thoughtful outreach, not blasting.`
+    );
+  }
+  if (warnings.length === 0) return null;
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+        Heads up
+      </div>
+      <ul className="mt-1 space-y-1">
+        {warnings.map((w) => (
+          <li key={w} className="text-sm text-amber-800">
+            {w}
           </li>
         ))}
       </ul>

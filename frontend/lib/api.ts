@@ -115,6 +115,135 @@ export type Message = {
   updated_at: string | null;
 };
 
+// ----- AI outreach layer -----
+
+export const OUTREACH_GOALS = [
+  "advice",
+  "referral",
+  "recruiter_intro",
+  "hiring_manager_intro",
+  "founder_intro",
+] as const;
+
+export const CONTACT_TYPES = [
+  "recruiter",
+  "technical_recruiter",
+  "hiring_manager",
+  "engineer",
+  "alumni",
+  "founder",
+] as const;
+
+export type Goal = {
+  id: number;
+  target_role: string | null;
+  target_location: string | null;
+  target_company_type: string | null;
+  outreach_goal: string | null;
+  tone_preference: string | null;
+  max_contacts_per_company: number | null;
+  preferred_contact_types: string[];
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type GoalInput = {
+  target_role?: string;
+  target_location?: string;
+  target_company_type?: string;
+  outreach_goal?: string;
+  tone_preference?: string;
+  max_contacts_per_company?: number;
+  preferred_contact_types?: string[];
+  notes?: string;
+};
+
+export type Contact = {
+  id: number;
+  job_id: number | null;
+  name: string | null;
+  title: string | null;
+  company: string | null;
+  email: string | null;
+  linkedin_url: string | null;
+  contact_type: string | null;
+  email_confidence: number | null;
+  source: string;
+  source_note: string | null;
+  why_relevant: string | null;
+  risk_note: string | null;
+  created_at: string | null;
+};
+
+export type ManualContactInput = {
+  name: string;
+  title?: string;
+  company?: string;
+  email?: string;
+  linkedin_url?: string;
+  contact_type?: string;
+  email_confidence?: number;
+  source_note?: string;
+  job_id?: number;
+};
+
+export type DiscoverResult = {
+  id?: number;
+  name: string | null;
+  title: string | null;
+  company: string | null;
+  email: string | null;
+  email_confidence: number | null;
+  source: string;
+  contact_type: string | null;
+  why_relevant: string | null;
+  risk_note: string | null;
+};
+
+export type DiscoverResponse = {
+  api_discovery_configured: boolean;
+  providers_available: string[];
+  message: string;
+  results: DiscoverResult[];
+};
+
+export type EmailDraft = {
+  id: number;
+  job_id: number | null;
+  contact_id: number | null;
+  goal_id: number | null;
+  company: string | null;
+  role: string | null;
+  contact_name: string | null;
+  contact_title: string | null;
+  contact_email: string | null;
+  contact_why_relevant: string | null;
+  subject: string | null;
+  body: string | null;
+  message_type: string;
+  tone: string | null;
+  personalization_notes: string | null;
+  quality_checklist: Checklist;
+  risk_checklist: Checklist;
+  why_safe: string | null;
+  suggested_next_step: string | null;
+  llm_used: boolean;
+  status: string;
+  outcome: string | null;
+  follow_up_status: string | null;
+  follow_up_due_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type GmailSendResponse = {
+  ok: boolean;
+  sent: boolean;
+  status: string;
+  message: string;
+};
+
 export const OUTCOMES = [
   "connected",
   "replied",
@@ -270,6 +399,75 @@ export const api = {
   // Insights / dashboard
   getStats: () => request<DashboardStats>("/stats"),
   getOutcomes: () => request<OutcomesResponse>("/outcomes"),
+
+  // Goals
+  getGoals: () => request<Goal[]>("/goals"),
+  createGoal: (goal: GoalInput) =>
+    request<Goal>("/goals", { method: "POST", body: JSON.stringify(goal) }),
+  updateGoal: (id: number, goal: GoalInput) =>
+    request<Goal>(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(goal) }),
+  deleteGoal: (id: number) =>
+    request<{ status: string; id: number }>(`/goals/${id}`, { method: "DELETE" }),
+
+  // Contacts
+  getContacts: (jobId?: number) =>
+    request<Contact[]>(`/contacts${jobId != null ? `?job_id=${jobId}` : ""}`),
+  addManualContact: (input: ManualContactInput) =>
+    request<Contact>("/contacts/manual", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  discoverContacts: (input: {
+    job_id?: number;
+    goal_id?: number;
+    contact_type: string;
+    max_results?: number;
+  }) =>
+    request<DiscoverResponse>("/contacts/discover", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  // Emails (AI draft + approval queue; never auto-sends)
+  draftEmail: (input: {
+    job_id: number;
+    contact_id: number;
+    goal_id?: number | null;
+    tone?: string;
+  }) =>
+    request<EmailDraft>("/emails/draft", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  getEmails: () => request<EmailDraft[]>("/emails"),
+  getEmail: (id: number) => request<EmailDraft>(`/emails/${id}`),
+  patchEmail: (
+    id: number,
+    patch: {
+      subject?: string;
+      body?: string;
+      outcome?: string;
+      follow_up_status?: string;
+      follow_up_due_date?: string | null;
+    }
+  ) =>
+    request<EmailDraft>(`/emails/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  approveEmail: (id: number) =>
+    request<EmailDraft>(`/emails/${id}/approve`, { method: "POST" }),
+  rejectEmail: (id: number) =>
+    request<EmailDraft>(`/emails/${id}/reject`, { method: "POST" }),
+  markEmailCopied: (id: number) =>
+    request<EmailDraft>(`/emails/${id}/mark-copied`, { method: "POST" }),
+  markEmailSentManual: (id: number) =>
+    request<EmailDraft>(`/emails/${id}/mark-sent-manual`, { method: "POST" }),
+  sendEmailGmail: (id: number, confirm_send = false) =>
+    request<GmailSendResponse>(`/emails/${id}/send-gmail`, {
+      method: "POST",
+      body: JSON.stringify({ confirm_send }),
+    }),
 
   // Demo
   seedDemo: () => request<SeedResult>("/demo/seed", { method: "POST" }),

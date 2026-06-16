@@ -7,7 +7,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import Base, engine, run_lightweight_migrations
-from .routers import demo, insights, jobs, messages, profile
+from .routers import (
+    contacts,
+    demo,
+    emails,
+    goals,
+    insights,
+    jobs,
+    messages,
+    profile,
+)
 
 # Create tables on startup (simple for MVP; swap for migrations later).
 Base.metadata.create_all(bind=engine)
@@ -30,6 +39,9 @@ app.include_router(jobs.router)
 app.include_router(messages.router)
 app.include_router(insights.router)
 app.include_router(demo.router)
+app.include_router(goals.router)
+app.include_router(contacts.router)
+app.include_router(emails.router)
 
 
 @app.get("/health")

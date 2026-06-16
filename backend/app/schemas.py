@@ -114,6 +114,61 @@ class MessageOut(BaseModel):
         from_attributes = True
 
 
+# ----- Goals -----
+
+class GoalIn(BaseModel):
+    target_role: Optional[str] = None
+    target_location: Optional[str] = None
+    target_company_type: Optional[str] = None
+    outreach_goal: Optional[str] = None
+    tone_preference: Optional[str] = None
+    max_contacts_per_company: Optional[int] = 3
+    preferred_contact_types: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+
+# ----- Contacts -----
+
+class ContactManualIn(BaseModel):
+    name: str
+    title: Optional[str] = None
+    company: Optional[str] = None
+    email: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    contact_type: Optional[str] = None
+    email_confidence: Optional[int] = None
+    source_note: Optional[str] = None
+    job_id: Optional[int] = None
+
+
+class DiscoverIn(BaseModel):
+    job_id: Optional[int] = None
+    goal_id: Optional[int] = None
+    contact_type: str = "recruiter"
+    max_results: int = 5
+
+
+# ----- Emails -----
+
+class EmailDraftIn(BaseModel):
+    job_id: int
+    contact_id: int
+    goal_id: Optional[int] = None
+    tone: Optional[str] = "warm_low_pressure"
+
+
+class EmailPatchIn(BaseModel):
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    outcome: Optional[str] = None
+    follow_up_status: Optional[str] = None
+    follow_up_due_date: Optional[str] = None
+
+
+class GmailSendIn(BaseModel):
+    confirm_send: bool = False
+
+
 # ----- Generic -----
 
 class StatusResponse(BaseModel):

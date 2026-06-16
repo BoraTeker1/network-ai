@@ -7,3 +7,5 @@ requests==2.32.3
 python-multipart==0.0.12
 pypdf==5.1.0
 python-docx==1.1.2
+# Responses API (client.responses.create) requires SDK >= 1.66; 1.59 lacked it.
+openai>=1.66,<3

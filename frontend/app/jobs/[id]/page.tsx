@@ -10,13 +10,20 @@ import {
   ContactSearch,
   Message,
   OutreachStrategy,
+  Contact,
+  DiscoverResponse,
+  EmailDraft,
+  Goal,
+  CONTACT_TYPES,
 } from "@/lib/api";
 import {
   recommendationStyle,
   NextBestAction,
   ToneBadge,
   SectionLabel,
+  LimitsWarning,
 } from "@/components/ui";
+import EmailDraftCard from "@/components/EmailDraftCard";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -268,6 +275,9 @@ export default function JobDetailPage() {
         </section>
       )}
 
+      {/* Contacts & AI email outreach */}
+      <ContactsOutreach jobId={jobId} company={job.company} />
+
       {/* Contact searches */}
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold">Contact Search Suggestions</h2>
@@ -366,5 +376,323 @@ export default function JobDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+
+// ---- Contacts & AI email outreach (manual-first, compliant discovery) ----
+
+const EMPTY_CONTACT = {
+  name: "",
+  title: "",
+  email: "",
+  linkedin_url: "",
+  contact_type: "recruiter",
+  source_note: "",
+};
+
+function ContactsOutreach({
+  jobId,
+  company,
+}: {
+  jobId: number;
+  company: string | null;
+}) {
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [discovery, setDiscovery] = useState<DiscoverResponse | null>(null);
+  const [discoverType, setDiscoverType] = useState("technical_recruiter");
+  const [form, setForm] = useState({ ...EMPTY_CONTACT });
+  const [showForm, setShowForm] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const [goals, cs] = await Promise.all([
+        api.getGoals().catch(() => []),
+        api.getContacts(jobId).catch(() => []),
+      ]);
+      setGoal(goals[0] ?? null);
+      setContacts(cs);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load contacts");
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  async function handleDiscover() {
+    setBusy("discover");
+    setError(null);
+    try {
+      setDiscovery(
+        await api.discoverContacts({
+          job_id: jobId,
+          goal_id: goal?.id,
+          contact_type: discoverType,
+          max_results: 5,
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Discovery failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleAddManual() {
+    if (!form.name.trim()) {
+      setError("Contact name is required.");
+      return;
+    }
+    setBusy("add");
+    setError(null);
+    try {
+      await api.addManualContact({
+        name: form.name,
+        title: form.title || undefined,
+        email: form.email || undefined,
+        linkedin_url: form.linkedin_url || undefined,
+        contact_type: form.contact_type,
+        source_note: form.source_note || undefined,
+        job_id: jobId,
+      });
+      setForm({ ...EMPTY_CONTACT });
+      setShowForm(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add contact");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDraft(contactId: number) {
+    setBusy(`draft-${contactId}`);
+    setError(null);
+    try {
+      const draft = await api.draftEmail({
+        job_id: jobId,
+        contact_id: contactId,
+        goal_id: goal?.id ?? null,
+        tone: goal?.tone_preference ?? "warm_low_pressure",
+      });
+      setDrafts((prev) => [draft, ...prev.filter((d) => d.id !== draft.id)]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to draft email");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function replaceDraft(updated: EmailDraft) {
+    setDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
+  const field =
+    "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Contacts &amp; AI Email Outreach</h2>
+        {!goal && (
+          <a href="/goals" className="text-xs font-medium text-blue-600 hover:underline">
+            Set a job-search goal to personalize drafts →
+          </a>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        Add contacts you found yourself, or run compliant discovery. No scraping,
+        no invented emails — and nothing is ever sent without your approval.
+      </p>
+
+      {error && (
+        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-3">
+        <LimitsWarning contactsForCompany={contacts.length} />
+      </div>
+
+      {/* Discover */}
+      <div className="mt-4 flex flex-wrap items-end gap-2">
+        <div>
+          <SectionLabel>Discover contact type</SectionLabel>
+          <select
+            className={field}
+            value={discoverType}
+            onChange={(e) => setDiscoverType(e.target.value)}
+          >
+            {CONTACT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={handleDiscover}
+          disabled={busy === "discover"}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy === "discover" ? "Discovering…" : "Discover Contacts"}
+        </button>
+        <button
+          onClick={() => setShowForm((s) => !s)}
+          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-400"
+        >
+          {showForm ? "Cancel" : "Add Contact Manually"}
+        </button>
+      </div>
+
+      {discovery && (
+        <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-3">
+          <p className="text-xs text-slate-600">{discovery.message}</p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Providers available: {discovery.providers_available.join(", ")}
+          </p>
+        </div>
+      )}
+
+      {/* Manual add form */}
+      {showForm && (
+        <div className="mt-4 grid gap-3 rounded-md border border-slate-100 bg-slate-50 p-4 sm:grid-cols-2">
+          <div>
+            <SectionLabel>Name *</SectionLabel>
+            <input
+              className={field}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div>
+            <SectionLabel>Title</SectionLabel>
+            <input
+              className={field}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </div>
+          <div>
+            <SectionLabel>Email</SectionLabel>
+            <input
+              className={field}
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <SectionLabel>LinkedIn URL (optional)</SectionLabel>
+            <input
+              className={field}
+              value={form.linkedin_url}
+              onChange={(e) =>
+                setForm({ ...form, linkedin_url: e.target.value })
+              }
+            />
+          </div>
+          <div>
+            <SectionLabel>Contact type</SectionLabel>
+            <select
+              className={field}
+              value={form.contact_type}
+              onChange={(e) =>
+                setForm({ ...form, contact_type: e.target.value })
+              }
+            >
+              {CONTACT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <SectionLabel>Source note</SectionLabel>
+            <input
+              className={field}
+              placeholder="e.g. company careers page"
+              value={form.source_note}
+              onChange={(e) =>
+                setForm({ ...form, source_note: e.target.value })
+              }
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              onClick={handleAddManual}
+              disabled={busy === "add"}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {busy === "add" ? "Adding…" : "Save Contact"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Contact list */}
+      <div className="mt-4 space-y-2">
+        {contacts.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No contacts yet for this company. Add one manually or run discovery.
+          </p>
+        ) : (
+          contacts.map((c) => (
+            <div
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-3"
+            >
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-900">
+                  {c.name}
+                  {c.title ? ` · ${c.title}` : ""}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {c.email || "no email"}
+                  {c.email_confidence != null
+                    ? ` · ${c.email_confidence}% confidence`
+                    : ""}{" "}
+                  · source: {c.source}
+                </div>
+                {c.why_relevant && (
+                  <div className="mt-0.5 text-xs text-slate-400">
+                    {c.why_relevant}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => handleDraft(c.id)}
+                disabled={busy === `draft-${c.id}`}
+                className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {busy === `draft-${c.id}` ? "Drafting…" : "Draft Email"}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Inline drafts created here */}
+      {drafts.length > 0 && (
+        <div className="mt-5 space-y-4">
+          <p className="text-sm text-green-700">
+            Draft created — review it below or in the{" "}
+            <a href="/emails" className="font-medium underline">
+              email approval queue →
+            </a>
+          </p>
+          {drafts.map((d) => (
+            <EmailDraftCard key={d.id} email={d} onUpdated={replaceDraft} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

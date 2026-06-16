@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, DashboardStats } from "@/lib/api";
+import { api, DashboardStats, Goal } from "@/lib/api";
 import {
   EmptyState,
   ErrorBanner,
@@ -57,6 +57,7 @@ function PlanItem({
 
 export default function Home() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [goal, setGoal] = useState<Goal | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,12 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      setStats(await api.getStats());
+      const [s, goals] = await Promise.all([
+        api.getStats(),
+        api.getGoals().catch(() => []),
+      ]);
+      setStats(s);
+      setGoal(goals[0] ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard");
     } finally {
@@ -172,6 +178,42 @@ export default function Home() {
           Open Pipeline
         </Link>
       </div>
+
+      {/* Current goal summary */}
+      {!loading && (
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Current job-search goal
+            </div>
+            <Link
+              href="/goals"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              {goal ? "Edit goal →" : "Set a goal →"}
+            </Link>
+          </div>
+          {goal ? (
+            <p className="mt-1 text-sm text-slate-700">
+              <span className="font-medium">
+                {goal.target_role || "Role TBD"}
+              </span>
+              {goal.target_location ? ` · ${goal.target_location}` : ""} · outreach
+              goal: <span className="font-medium">{goal.outreach_goal || "advice"}</span>
+              {goal.preferred_contact_types.length > 0
+                ? ` · contacts: ${goal.preferred_contact_types
+                    .map((t) => t.replace(/_/g, " "))
+                    .join(", ")}`
+                : ""}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-500">
+              No goal set yet — add one so the AI email copilot can personalize
+              drafts honestly.
+            </p>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <p className="mt-8 text-sm text-slate-500">Loading dashboard…</p>

@@ -7,6 +7,7 @@ v1 has no auth, so we hardcode a single demo user.
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -22,6 +23,33 @@ from .db import Base
 
 # No auth in v1 — every record belongs to this fake user.
 DEMO_USER_ID = "demo-user"
+
+# Controlled vocabularies for the AI outreach layer (kept here so routers /
+# services share one source of truth).
+OUTREACH_GOALS = (
+    "advice",
+    "referral",
+    "recruiter_intro",
+    "hiring_manager_intro",
+    "founder_intro",
+)
+CONTACT_TYPES = (
+    "recruiter",
+    "technical_recruiter",
+    "hiring_manager",
+    "engineer",
+    "alumni",
+    "founder",
+)
+# Email approval workflow (mirrors the manual-message workflow; never auto-sends).
+EMAIL_STATUSES = (
+    "draft",
+    "approved",
+    "rejected",
+    "copied",
+    "sent_manual",
+    "sent_via_gmail",
+)
 
 # Real-world outreach results the user can report on a sent message.
 OUTCOMES = (
@@ -147,3 +175,90 @@ class OutreachEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     message = relationship("Message", back_populates="events")
+
+
+# ----- AI outreach layer (additive tables; create_all handles them) -----
+
+
+class Goal(Base):
+    """The user's current job-search / outreach goal. Feeds email generation."""
+
+    __tablename__ = "goals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, default=DEMO_USER_ID)
+
+    target_role = Column(String, nullable=True)
+    target_location = Column(String, nullable=True)
+    target_company_type = Column(String, nullable=True)
+    outreach_goal = Column(String, nullable=True)        # one of OUTREACH_GOALS
+    tone_preference = Column(String, nullable=True)
+    max_contacts_per_company = Column(Integer, default=3)
+    preferred_contact_types = Column(Text, nullable=True)  # JSON list of CONTACT_TYPES
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Contact(Base):
+    """A person the user may reach out to. Manually added or, later, returned by
+    a COMPLIANT discovery provider. Contact info is never scraped or invented."""
+
+    __tablename__ = "contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
+
+    name = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    company = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    linkedin_url = Column(String, nullable=True)
+    contact_type = Column(String, nullable=True)          # one of CONTACT_TYPES
+    email_confidence = Column(Integer, nullable=True)      # 0-100, provider-supplied
+    source = Column(String, default="manual")             # "manual" | "hunter" | "pdl"
+    source_note = Column(Text, nullable=True)
+    why_relevant = Column(Text, nullable=True)
+    risk_note = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    job = relationship("Job")
+
+
+class EmailDraft(Base):
+    """An AI- or template-generated email draft awaiting user review/approval.
+
+    Nothing is ever sent automatically — status moves only on explicit user
+    action, exactly like the Message approval workflow."""
+
+    __tablename__ = "email_drafts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), index=True, nullable=True)
+    goal_id = Column(Integer, ForeignKey("goals.id"), index=True, nullable=True)
+
+    subject = Column(String, nullable=True)
+    body = Column(Text, nullable=True)
+    message_type = Column(String, default="outreach_email")
+    tone = Column(String, nullable=True)
+    personalization_notes = Column(Text, nullable=True)
+    quality_checklist = Column(Text, nullable=True)        # JSON
+    risk_checklist = Column(Text, nullable=True)           # JSON
+    llm_used = Column(Boolean, default=False)
+
+    status = Column(String, default="draft", index=True)   # one of EMAIL_STATUSES
+    outcome = Column(String, nullable=True, index=True)    # reuse OUTCOMES
+    follow_up_status = Column(String, nullable=True, index=True)
+    follow_up_due_date = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    job = relationship("Job")
+    contact = relationship("Contact")
+    goal = relationship("Goal")

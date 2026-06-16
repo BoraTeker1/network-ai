@@ -59,6 +59,55 @@ permission-based networking* — is provable, not promised.
 
 ---
 
+## AI email copilot (permission-based)
+
+Network AI can draft personalized outreach **emails** using your resume, your
+job-search goal, the selected job, and a contact you added — then route them
+through an approval queue. It is a copilot, never an autopilot:
+
+- **AI proposes, you approve.** Drafts land in `/emails` as proposed actions
+  with a "why this contact" rationale, a quality checklist, and a risk
+  checklist. Nothing is sent without your explicit approval.
+- **OpenAI Responses API only.** When `OPENAI_API_KEY` is set, drafts are
+  written by the model via the **Responses API** (no Chat Completions, no
+  Assistants, no Files/Vector Stores/embeddings). The key is read by the
+  backend only and is never logged, returned, or committed.
+- **Deterministic fallback.** With no key (or on any LLM error / invalid JSON),
+  the app falls back to a deterministic template. The draft shows
+  `llm_used: true/false` so you always know which path produced it.
+- **Manual-first contacts.** You add contacts yourself. A provider abstraction
+  (`ManualProvider`, plus `HunterProvider` / `PeopleDataLabsProvider`
+  placeholders) is ready for compliant API discovery later — but nothing runs
+  unless a key is present, and **no scraping is ever performed**.
+- **Gmail sending is disabled by default.** Copy / manual send is the path.
+
+### Environment variables
+
+Copy `backend/.env.example` to `backend/.env` and fill in what you need. All AI
+features degrade gracefully when blank.
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `LLM_PROVIDER` | LLM provider (only `openai` supported) | `openai` |
+| `OPENAI_API_KEY` | Enables LLM drafting via the Responses API | _(blank → fallback)_ |
+| `OPENAI_MODEL` | Model id for the Responses API | `gpt-4.1-mini` |
+| `HUNTER_API_KEY` | Optional compliant discovery provider | _(blank → off)_ |
+| `PDL_API_KEY` | Optional compliant discovery provider | _(blank → off)_ |
+| `GMAIL_SEND_ENABLED` | Must be `true` to even consider sending | `false` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Future Gmail OAuth | _(blank)_ |
+
+> The backend reads `.env` via `python-dotenv` and **never** writes or logs it.
+> Secrets stay server-side; the frontend never sees an API key.
+
+### Enabled now vs. placeholder
+
+- **Enabled now:** goals CRUD, manual contacts, compliant-discovery aggregation
+  (manual results + "not configured" message), AI/deterministic email drafting,
+  full email approval queue (edit/approve/reject/copy/mark-sent), outcome &
+  follow-up tracking, visible guardrails and soft limits.
+- **Placeholder (architecture only):** Hunter / PDL network calls, and Gmail
+  sending (returns a friendly "disabled" message; no OAuth/SMTP implemented).
+
 ## Safety & compliance philosophy
 
 Network AI is deliberately **not** a spam bot. The constraints below are
@@ -186,6 +235,19 @@ cd backend
 | GET    | `/outcomes`                            | Outcome counts + reported messages   |
 | GET    | `/stats`                               | Dashboard aggregates + funnel        |
 | POST   | `/demo/seed`                           | Seed demo data (offline, idempotent) |
+| GET/POST | `/goals`                             | List / create job-search goal        |
+| PATCH/DELETE | `/goals/{id}`                    | Update / delete a goal               |
+| POST   | `/contacts/manual`                     | Add a contact manually               |
+| GET    | `/contacts`                            | List contacts (optional `?job_id=`)  |
+| GET    | `/contacts/{id}`                       | Contact detail                       |
+| POST   | `/contacts/discover`                   | Compliant discovery (manual + providers) |
+| POST   | `/emails/draft`                        | Draft an email (LLM or fallback)     |
+| GET    | `/emails`                              | List email drafts (approval queue)   |
+| GET    | `/emails/{id}`                         | Email draft detail                   |
+| PATCH  | `/emails/{id}`                         | Edit body/subject, set outcome/follow-up |
+| POST   | `/emails/{id}/approve` · `/reject`     | Approve / reject a draft             |
+| POST   | `/emails/{id}/mark-copied` · `/mark-sent-manual` | Manual send workflow       |
+| POST   | `/emails/{id}/send-gmail`              | Disabled placeholder (friendly message) |
 
 Supported outcomes: `connected`, `replied`, `referral_received`,
 `interview_received`, `ignored`, `rejected`.
@@ -203,13 +265,44 @@ _Add screenshots here:_
 
 ---
 
+## AI email copilot — demo flow
+
+1. **Profile** → upload/paste a resume.
+2. **Goals** → create a goal, e.g. "Backend/AI engineer role in NYC or remote",
+   outreach goal = advice.
+3. **Jobs** → ingest, then **Matches** → match all.
+4. Open a **Strong Target** → review the outreach strategy.
+5. In **Contacts & AI Email Outreach**: add a recruiter/engineer contact (or run
+   discovery — without provider keys it shows the "not configured" message and
+   your manual contacts).
+6. Click **Draft Email**. If `OPENAI_API_KEY` is set the body is written by the
+   OpenAI Responses API (`llm_used: true`); otherwise it's a deterministic
+   template (`llm_used: false`).
+7. Review the **why this contact**, **quality checklist**, and **risk
+   checklist**; edit; **Approve**; **Copy Email** or **Mark Sent Manually**.
+8. Track the **outcome** and **follow-up** on the draft. (Gmail send stays
+   disabled.)
+
+## Limitations (stated honestly)
+
+- Contact discovery requires a compliant provider API key or manual input —
+  there is **no scraping** of LinkedIn or any website.
+- Gmail sending is **disabled by default**; this MVP prefers copy / manual send.
+- No auto-send and no bulk-send anywhere in the product.
+- The LLM uses the **OpenAI Responses API only** (no Chat Completions /
+  Assistants / Files / Vector Stores / embeddings).
+- This is a **local-first demo**, not production SaaS. A real version needs:
+  auth, encryption at rest, OAuth for any sending, rate limits, an
+  unsubscribe / do-not-contact list, a privacy policy, and a proper compliance
+  review before any outreach at scale.
+
 ## Future roadmap
 
-- Optional LLM-assisted drafting (still user-reviewed, never auto-sent).
+- Implement compliant provider discovery (Hunter / PDL) behind keys.
+- Safe Gmail OAuth send (approved + explicit confirm only), still no bulk.
 - Richer resume parsing (education, target roles, seniority).
 - Job descriptions for deeper match scoring beyond the title.
-- Saved contacts per company and per-message reminders.
-- Export pipeline to CSV.
+- Export pipeline to CSV; weekly networking digest.
 - Multi-user support with auth (out of scope for this MVP).
 
 ---
