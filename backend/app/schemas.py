@@ -55,6 +55,14 @@ class IngestResult(BaseModel):
     total_in_db: int
 
 
+class NewGradIngestIn(BaseModel):
+    """Optional knobs for the newgrad-jobs.com ingestion (all have safe defaults)."""
+
+    categories: Optional[List[str]] = None       # default category set if None
+    max_per_category: Optional[int] = 15         # conservative cap per category
+    request_delay: Optional[float] = None        # seconds between detail fetches
+
+
 # ----- Job match -----
 
 class JobMatchOut(BaseModel):

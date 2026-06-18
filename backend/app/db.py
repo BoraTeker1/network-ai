@@ -38,18 +38,40 @@ def run_lightweight_migrations() -> None:
     introduced after the first release. Safe to run on every startup.
     """
     inspector = inspect(engine)
-    if "messages" not in inspector.get_table_names():
-        return  # create_all() will build it fresh with the column already present.
+    tables = set(inspector.get_table_names())
 
-    columns = {col["name"] for col in inspector.get_columns("messages")}
-    # (column name -> ADD COLUMN statement) for every additive column.
-    additive = {
-        "outcome": "ALTER TABLE messages ADD COLUMN outcome VARCHAR",
-        "follow_up_status": "ALTER TABLE messages ADD COLUMN follow_up_status VARCHAR",
-        "follow_up_due_date": "ALTER TABLE messages ADD COLUMN follow_up_due_date VARCHAR",
+    # (table -> {column name -> ADD COLUMN statement}) for every additive column.
+    additive_by_table = {
+        "messages": {
+            "outcome": "ALTER TABLE messages ADD COLUMN outcome VARCHAR",
+            "follow_up_status": "ALTER TABLE messages ADD COLUMN follow_up_status VARCHAR",
+            "follow_up_due_date": "ALTER TABLE messages ADD COLUMN follow_up_due_date VARCHAR",
+        },
+        # Richer normalized job fields introduced with the newgrad-jobs.com adapter.
+        "jobs": {
+            "employment_type": "ALTER TABLE jobs ADD COLUMN employment_type VARCHAR",
+            "work_mode": "ALTER TABLE jobs ADD COLUMN work_mode VARCHAR",
+            "salary_range": "ALTER TABLE jobs ADD COLUMN salary_range VARCHAR",
+            "level": "ALTER TABLE jobs ADD COLUMN level VARCHAR",
+            "description": "ALTER TABLE jobs ADD COLUMN description TEXT",
+            "responsibilities": "ALTER TABLE jobs ADD COLUMN responsibilities TEXT",
+            "qualifications": "ALTER TABLE jobs ADD COLUMN qualifications TEXT",
+            "benefits": "ALTER TABLE jobs ADD COLUMN benefits TEXT",
+            "source_url": "ALTER TABLE jobs ADD COLUMN source_url VARCHAR",
+            "external_apply_url": "ALTER TABLE jobs ADD COLUMN external_apply_url VARCHAR",
+            "is_closed": "ALTER TABLE jobs ADD COLUMN is_closed BOOLEAN DEFAULT 0",
+            "discovered_at": "ALTER TABLE jobs ADD COLUMN discovered_at DATETIME",
+        },
     }
-    missing = [sql for name, sql in additive.items() if name not in columns]
-    if missing:
+
+    statements: list[str] = []
+    for table, additive in additive_by_table.items():
+        if table not in tables:
+            continue  # create_all() builds it fresh with the columns present.
+        existing = {col["name"] for col in inspector.get_columns(table)}
+        statements.extend(sql for name, sql in additive.items() if name not in existing)
+
+    if statements:
         with engine.begin() as conn:
-            for sql in missing:
+            for sql in statements:
                 conn.execute(text(sql))

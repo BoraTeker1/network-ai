@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import Base, engine, run_lightweight_migrations
 from .routers import (
     contacts,
+    dashboard,
     demo,
     emails,
     goals,
@@ -46,6 +47,7 @@ app.include_router(contacts.router)
 app.include_router(emails.router)
 app.include_router(momentum.router)
 app.include_router(next_move.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")

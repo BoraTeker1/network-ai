@@ -21,7 +21,34 @@ export type Job = {
   title: string | null;
   location: string | null;
   url: string | null;
+  // Richer normalized fields — populated by adapters like newgrad-jobs.com;
+  // older Simplify rows leave these null/empty.
+  employment_type?: string | null;
+  work_mode?: string | null;
+  salary_range?: string | null;
+  level?: string | null;
+  description?: string | null;
+  responsibilities?: string[];
+  qualifications?: string[];
+  benefits?: string[];
+  source_url?: string | null;
+  external_apply_url?: string | null;
+  is_closed?: boolean;
+  posted_at?: string | null;
   created_at: string | null;
+  discovered_at?: string | null;
+};
+
+export type NewGradIngestResult = {
+  source: string;
+  categories: string[];
+  fetched_count: number;
+  created_count: number;
+  updated_count: number;
+  skipped_closed_count: number;
+  duplicate_count: number;
+  errors: string[];
+  total_in_db: number;
 };
 
 export type MatchBreakdownItem = {
@@ -337,6 +364,80 @@ export type DashboardStats = {
   recent_messages: Message[];
 };
 
+// ----- Today's Networking Mission (dashboard command center) -----
+
+export type RecommendedContactType = {
+  contact_type: string;
+  label: string;
+  why: string;
+};
+
+export type ContactPlan = {
+  who_first: string;
+  contact_count: string;
+  tone: string;
+  ask_type: string;
+  sequence: StrategyStep[];
+  recommended_contact_types: RecommendedContactType[];
+};
+
+export type SetupStep = {
+  key: string;
+  title: string;
+  description: string;
+  cta_href: string;
+  cta_label: string;
+  done: boolean;
+};
+
+export type FollowUpItem = {
+  kind: "message" | "email";
+  id: number;
+  company: string | null;
+  role: string | null;
+  due_date: string | null;
+};
+
+export type Mission = {
+  ready: boolean;
+  headline: string;
+  focus: string | null;
+  profile: { exists: boolean; skills_count: number; skills: string[] };
+  goal: {
+    id: number;
+    target_role: string | null;
+    target_location: string | null;
+    target_company_type: string | null;
+    outreach_goal: string | null;
+    tone_preference: string | null;
+    preferred_contact_types: string[];
+  } | null;
+  best_job: RankedMatch | null;
+  match_label: string | null;
+  match_explanation: string | null;
+  recommended_next_action: string | null;
+  contact_plan: ContactPlan | null;
+  drafts: {
+    message_drafts: number;
+    email_drafts: number;
+    pending_review: number;
+    ready_to_send: number;
+  };
+  follow_ups: { due: number; items: FollowUpItem[] };
+  pipeline: {
+    jobs_found: number;
+    strong_matches: number;
+    drafts: number;
+    sent: number;
+    replies: number;
+    interviews: number;
+    funnel: FunnelStage[];
+  };
+  momentum: MomentumSummary;
+  setup_steps: SetupStep[];
+  next_setup_step: SetupStep | null;
+};
+
 export type OutcomesResponse = {
   supported: string[];
   counts: Record<string, number>;
@@ -402,6 +503,15 @@ export const api = {
   // Jobs
   ingestJobs: () =>
     request<IngestResult>("/jobs/ingest/simplify", { method: "POST" }),
+  ingestNewGradJobs: (body?: {
+    categories?: string[];
+    max_per_category?: number;
+    request_delay?: number;
+  }) =>
+    request<NewGradIngestResult>("/jobs/ingest/newgrad-jobs", {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
   getJobs: (limit = 100) => request<Job[]>(`/jobs?limit=${limit}`),
   getJob: (id: number) => request<Job>(`/jobs/${id}`),
   matchJob: (id: number) =>
@@ -459,6 +569,7 @@ export const api = {
   // Insights / dashboard
   getStats: () => request<DashboardStats>("/stats"),
   getOutcomes: () => request<OutcomesResponse>("/outcomes"),
+  getMission: () => request<Mission>("/dashboard/mission"),
 
   // Momentum (Vibe Mode gamification)
   getMomentum: () => request<MomentumSummary>("/momentum/summary"),

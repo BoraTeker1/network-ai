@@ -111,9 +111,42 @@ export default function JobDetailPage() {
         <Link href="/jobs" className="text-sm text-blue-600 hover:underline">
           ← Back to jobs
         </Link>
-        <h1 className="mt-2 text-2xl font-bold">{job.title}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold">{job.title}</h1>
+          {job.is_closed && (
+            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
+              Closed
+            </span>
+          )}
+        </div>
         <div className="text-slate-600">
           {job.company} · {job.location || "Location N/A"}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {job.level && (
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+              {job.level}
+            </span>
+          )}
+          {job.employment_type && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              {job.employment_type}
+            </span>
+          )}
+          {job.work_mode && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              {job.work_mode}
+            </span>
+          )}
+          {job.salary_range && (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+              {job.salary_range}
+            </span>
+          )}
+        </div>
+        <div className="mt-1 text-xs text-slate-400">
+          Source: {job.source}
+          {job.posted_at ? ` · posted ${job.posted_at}` : ""}
         </div>
         {job.url && (
           <a
@@ -122,10 +155,48 @@ export default function JobDetailPage() {
             rel="noopener noreferrer"
             className="mt-1 inline-block text-sm text-blue-600 hover:underline"
           >
-            Open job posting ↗
+            Open apply / job posting ↗
           </a>
         )}
+        {job.source === "newgrad-jobs.com" && job.external_apply_url && (
+          <p className="mt-1 text-xs text-slate-400">
+            Apply link is provided as-is and may route through an aggregator —
+            verify it points to the company before applying.
+          </p>
+        )}
       </div>
+
+      {(job.description ||
+        (job.responsibilities?.length ?? 0) > 0 ||
+        (job.qualifications?.length ?? 0) > 0 ||
+        (job.benefits?.length ?? 0) > 0) && (
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-semibold">Role details</h2>
+          {job.description && (
+            <p className="mt-2 text-sm text-slate-700">{job.description}</p>
+          )}
+          {(
+            [
+              ["Responsibilities", job.responsibilities],
+              ["Qualifications", job.qualifications],
+              ["Benefits", job.benefits],
+            ] as const
+          ).map(([label, items]) =>
+            items && items.length > 0 ? (
+              <div key={label} className="mt-3">
+                <SectionLabel>{label}</SectionLabel>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
+                  {items.map((it, i) => (
+                    <li key={i}>{it}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null
+          )}
+        </section>
+      )}
+
+      <NetworkSteps />
 
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -376,6 +447,50 @@ export default function JobDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+
+// ---- Guided "Network for this job" steps (just a map of the page below) ----
+
+const NETWORK_STEPS = [
+  { title: "Review the match reason", detail: "See the transparent score and why this role is worth your effort." },
+  { title: "Plan who to contact", detail: "Use the deterministic outreach strategy — who first, how many, what tone." },
+  { title: "Add a contact", detail: "Find people yourself (no scraping) and add them manually." },
+  { title: "Draft messages", detail: "Generate permission-based drafts — AI proposes, you decide." },
+  { title: "Approve & copy", detail: "Edit, approve, copy — nothing is ever sent for you." },
+  { title: "Update your pipeline", detail: "Mark sent and log the outcome to keep momentum honest." },
+];
+
+function NetworkSteps() {
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-600" />
+      <div className="p-4">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Network for this job — your guided flow
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Work top to bottom. Everything below is a copilot step: you approve,
+          copy, and send each message yourself.
+        </p>
+        <ol className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {NETWORK_STEPS.map((s, i) => (
+            <li
+              key={s.title}
+              className="flex items-start gap-2 rounded-md border border-slate-100 bg-slate-50 p-2.5"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700">
+                {i + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-slate-800">{s.title}</div>
+                <p className="text-[11px] text-slate-500">{s.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }
 

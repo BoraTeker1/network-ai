@@ -161,12 +161,18 @@ export default function MatchesPage() {
                 </div>
               )}
 
-              <div className="mt-3">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link
                   href={`/jobs/${m.job_id}`}
-                  className="text-sm font-medium text-blue-600 hover:underline"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
-                  Open job & outreach →
+                  Network for this job →
+                </Link>
+                <Link
+                  href={`/jobs/${m.job_id}`}
+                  className="text-sm font-medium text-slate-500 hover:text-blue-600 hover:underline"
+                >
+                  View match details
                 </Link>
               </div>
             </div>

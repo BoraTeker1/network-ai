@@ -7,21 +7,36 @@ NOTE: static paths like /jobs/matches/ranked are declared BEFORE the
 /jobs/{job_id} catch-all so they aren't swallowed by the int path param.
 """
 
+import json
+
 import requests
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Job
+from ..schemas import NewGradIngestIn
 from ..services.job_ingestion import ingest_jobs
-from ..services import matcher, strategy
+from ..services import matcher, newgrad_jobs, strategy
 from ..services.contact_search import contact_searches_for_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+def _loads_list(blob: str | None) -> list:
+    try:
+        val = json.loads(blob) if blob else []
+        return val if isinstance(val, list) else []
+    except (ValueError, TypeError):
+        return []
+
+
 def _serialize(job: Job) -> dict:
-    """Convert a Job row into a clean JSON-friendly dict."""
+    """Convert a Job row into a clean JSON-friendly dict.
+
+    Includes the richer normalized fields (populated by newer adapters such as
+    newgrad-jobs.com); older Simplify rows simply return null/empty for them.
+    """
     return {
         "id": job.id,
         "source": job.source,
@@ -29,7 +44,20 @@ def _serialize(job: Job) -> dict:
         "title": job.title,
         "location": job.location,
         "url": job.url,
+        "employment_type": job.employment_type,
+        "work_mode": job.work_mode,
+        "salary_range": job.salary_range,
+        "level": job.level,
+        "description": job.description,
+        "responsibilities": _loads_list(job.responsibilities),
+        "qualifications": _loads_list(job.qualifications),
+        "benefits": _loads_list(job.benefits),
+        "source_url": job.source_url,
+        "external_apply_url": job.external_apply_url,
+        "is_closed": bool(job.is_closed),
+        "posted_at": job.posted_at,
         "created_at": job.created_at.isoformat() if job.created_at else None,
+        "discovered_at": job.discovered_at.isoformat() if job.discovered_at else None,
     }
 
 
@@ -48,6 +76,27 @@ def ingest_simplify(db: Session = Depends(get_db)):
     except Exception as exc:  # parsing/db safety net for the MVP
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}")
     return result
+
+
+@router.post("/ingest/newgrad-jobs")
+def ingest_newgrad(
+    payload: NewGradIngestIn | None = None, db: Session = Depends(get_db)
+):
+    """Fetch + parse + store deduplicated jobs from newgrad-jobs.com category
+    pages. Permission-first and conservative: only newgrad-jobs.com is fetched,
+    requests are rate-limited and capped, closed jobs are skipped, and no
+    external boards are scraped. Page-level failures are returned in `errors`
+    rather than raising, so a missing category never breaks the run.
+    """
+    payload = payload or NewGradIngestIn()
+    return newgrad_jobs.ingest_newgrad_jobs(
+        db,
+        categories=payload.categories or None,
+        max_per_category=payload.max_per_category or 15,
+        request_delay=payload.request_delay
+        if payload.request_delay is not None
+        else 0.5,
+    )
 
 
 # ----- Matching / ranking (static paths first) -----

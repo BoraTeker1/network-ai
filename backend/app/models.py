@@ -123,7 +123,26 @@ class Job(Base):
     posted_at = Column(String, nullable=True)   # kept as raw text from source
     raw = Column(Text, nullable=True)           # original row/blob for debugging
 
+    # ----- Richer normalized fields (additive; populated by newer adapters such
+    # as the newgrad-jobs.com source — older Simplify rows simply leave them
+    # NULL). See db.run_lightweight_migrations() for the SQLite ADD COLUMNs. -----
+    employment_type = Column(String, nullable=True)   # Full-time / Internship / ...
+    work_mode = Column(String, nullable=True)         # Onsite / Remote / Hybrid
+    salary_range = Column(String, nullable=True)      # e.g. "$57K/yr - $109K/yr"
+    level = Column(String, nullable=True)             # e.g. "Entry Level" / "New Grad"
+    description = Column(Text, nullable=True)
+    responsibilities = Column(Text, nullable=True)    # JSON list of strings
+    qualifications = Column(Text, nullable=True)      # JSON list of strings
+    benefits = Column(Text, nullable=True)            # JSON list of strings
+    # source_url is the listing/detail page we discovered the job on; url +
+    # external_apply_url hold the honest apply destination (may be an aggregator,
+    # so we never *claim* it is the official company ATS unless it clearly is).
+    source_url = Column(String, nullable=True)
+    external_apply_url = Column(String, nullable=True)
+    is_closed = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
+    discovered_at = Column(DateTime, default=datetime.utcnow)
 
     matches = relationship("JobMatch", back_populates="job")
     messages = relationship("Message", back_populates="job")

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const links = [
-  { href: "/", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/profile", label: "Profile" },
   { href: "/goals", label: "Goals" },
   { href: "/jobs", label: "Jobs" },
@@ -18,11 +18,11 @@ export default function Nav() {
   return (
     <header className="border-b border-slate-200 bg-white">
       <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <Link href="/" className="shrink-0 whitespace-nowrap font-semibold text-slate-900">
+        <Link href="/dashboard" className="shrink-0 whitespace-nowrap font-semibold text-slate-900">
           Network<span className="text-blue-600">AI</span>
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          {links.slice(1).map((l) => (
+          {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
