@@ -114,3 +114,37 @@ def test_email_draft_fallback_and_disabled_gmail(client, seeded_job, monkeypatch
     gmail = client.post(f"/emails/{draft['id']}/send-gmail", json={"confirm_send": True}).json()
     assert gmail["sent"] is False
     assert "disabled" in gmail["message"].lower()
+
+
+def test_linkedin_draft_flow(client, seeded_job, monkeypatch):
+    monkeypatch.setattr(llm_client, "llm_available", lambda: False)
+    _save_profile(client)
+    contact = client.post("/contacts/manual", json={
+        "name": "Jordan Smith", "title": "Engineer", "contact_type": "engineer",
+        "job_id": seeded_job.id,
+    }).json()
+
+    # Connection note: no subject, capped at 300 chars, stored as a LinkedIn draft.
+    note = client.post("/linkedin/draft", json={
+        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "connection",
+    }).json()
+    assert note["llm_used"] is False
+    assert note["subject"] is None
+    assert note["message_type"] == "linkedin_connection"
+    assert 0 < len(note["body"]) <= 300
+
+    # DM is a separate kind.
+    dm = client.post("/linkedin/draft", json={
+        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "dm",
+    }).json()
+    assert dm["message_type"] == "linkedin_dm"
+
+    # LinkedIn drafts reuse the /emails approval workflow + appear in the queue.
+    approved = client.post(f"/emails/{note['id']}/approve").json()
+    assert approved["status"] == "approved"
+    assert note["id"] in [e["id"] for e in client.get("/emails").json()]
+
+    bad = client.post("/linkedin/draft", json={
+        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "bogus",
+    })
+    assert bad.status_code == 400

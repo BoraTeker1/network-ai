@@ -37,6 +37,19 @@ export default function EmailDraftCard({
   const [gmailMsg, setGmailMsg] = useState<string | null>(null);
   const { celebrate } = useMomentum();
 
+  // LinkedIn drafts are stored as EmailDraft rows but render differently: no
+  // subject line, a character counter (LinkedIn caps connection notes at 300),
+  // and copy/send chrome tuned for pasting into LinkedIn yourself.
+  const isLinkedIn = (email.message_type ?? "").startsWith("linkedin");
+  const isConnection = email.message_type === "linkedin_connection";
+  const charLimit = isConnection ? 300 : 600;
+  const overLimit = isLinkedIn && body.length > charLimit;
+  const channelLabel = isConnection
+    ? "LinkedIn connection note"
+    : isLinkedIn
+    ? "LinkedIn message"
+    : "email";
+
   async function run(fn: () => Promise<EmailDraft>) {
     setBusy(true);
     setError(null);
@@ -52,8 +65,10 @@ export default function EmailDraftCard({
   }
 
   async function handleCopy() {
+    // LinkedIn has no subject — copy the body alone so it pastes cleanly.
+    const clip = isLinkedIn ? body : `Subject: ${subject}\n\n${body}`;
     try {
-      await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+      await navigator.clipboard.writeText(clip);
     } catch {
       /* clipboard may be blocked; still record the copy */
     }
@@ -78,7 +93,9 @@ export default function EmailDraftCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-            AI proposes emailing this person
+            {isLinkedIn
+              ? `AI proposes a ${channelLabel}`
+              : "AI proposes emailing this person"}
           </div>
           <div className="mt-0.5 text-sm font-semibold text-slate-900">
             {email.contact_name || "Unknown contact"}
@@ -119,26 +136,48 @@ export default function EmailDraftCard({
         </p>
       )}
 
-      {/* Subject + body (editable) */}
-      <div className="mt-3">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Subject
-        </label>
-        <input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-      </div>
+      {/* Subject + body (editable). LinkedIn drafts have no subject. */}
+      {!isLinkedIn && (
+        <div className="mt-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Subject
+          </label>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+      )}
       <div className="mt-2">
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Body ({body.split(/\s+/).filter(Boolean).length} words)
+          {isLinkedIn ? (
+            <>
+              Message{" "}
+              <span className={overLimit ? "text-red-600" : "text-slate-400"}>
+                ({body.length}/{charLimit} chars)
+              </span>
+            </>
+          ) : (
+            <>Body ({body.split(/\s+/).filter(Boolean).length} words)</>
+          )}
         </label>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          className="mt-1 h-40 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+          className={`mt-1 h-40 w-full rounded-md border p-2 text-sm focus:outline-none ${
+            overLimit
+              ? "border-red-400 focus:border-red-500"
+              : "border-slate-300 focus:border-blue-500"
+          }`}
         />
+        {overLimit && (
+          <p className="mt-1 text-xs text-red-600">
+            {isConnection
+              ? "LinkedIn rejects connection notes over 300 characters — trim before copying."
+              : "This is longer than recommended for a LinkedIn message — consider trimming."}
+          </p>
+        )}
       </div>
 
       {email.personalization_notes && (
@@ -206,22 +245,25 @@ export default function EmailDraftCard({
           onClick={handleCopy}
           className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Copy Email
+          {isLinkedIn ? (isConnection ? "Copy note" : "Copy message") : "Copy Email"}
         </button>
         <button
           disabled={busy}
           onClick={() => run(() => api.markEmailSentManual(email.id))}
           className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
         >
-          Mark Sent Manually
+          {isLinkedIn ? "Mark Sent on LinkedIn" : "Mark Sent Manually"}
         </button>
-        <button
-          onClick={handleGmail}
-          title="Gmail sending requires OAuth configuration. Manual copy is available."
-          className="cursor-not-allowed rounded border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-400"
-        >
-          Send via Gmail (disabled)
-        </button>
+        {/* Gmail send only applies to email drafts. */}
+        {!isLinkedIn && (
+          <button
+            onClick={handleGmail}
+            title="Gmail sending requires OAuth configuration. Manual copy is available."
+            className="cursor-not-allowed rounded border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-400"
+          >
+            Send via Gmail (disabled)
+          </button>
+        )}
       </div>
       {gmailMsg && (
         <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">

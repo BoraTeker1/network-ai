@@ -586,19 +586,28 @@ function ContactsOutreach({
     }
   }
 
-  async function handleDraft(contactId: number) {
-    setBusy(`draft-${contactId}`);
+  // One handler for all three channels — email, a LinkedIn connection note, or
+  // a LinkedIn DM. They all return an EmailDraft that the same card renders.
+  async function handleDraft(
+    contactId: number,
+    channel: "email" | "connection" | "dm"
+  ) {
+    setBusy(`draft-${channel}-${contactId}`);
     setError(null);
     try {
-      const draft = await api.draftEmail({
+      const common = {
         job_id: jobId,
         contact_id: contactId,
         goal_id: goal?.id ?? null,
         tone: goal?.tone_preference ?? "warm_low_pressure",
-      });
+      };
+      const draft =
+        channel === "email"
+          ? await api.draftEmail(common)
+          : await api.draftLinkedIn({ ...common, kind: channel });
       setDrafts((prev) => [draft, ...prev.filter((d) => d.id !== draft.id)]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to draft email");
+      setError(e instanceof Error ? e.message : "Failed to draft outreach");
     } finally {
       setBusy(null);
     }
@@ -614,7 +623,7 @@ function ContactsOutreach({
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Contacts &amp; AI Email Outreach</h2>
+        <h2 className="text-lg font-semibold">Contacts &amp; AI Outreach</h2>
         {!goal && (
           <a href="/goals" className="text-xs font-medium text-blue-600 hover:underline">
             Set a job-search goal to personalize drafts →
@@ -782,13 +791,33 @@ function ContactsOutreach({
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => handleDraft(c.id)}
-                disabled={busy === `draft-${c.id}`}
-                className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                {busy === `draft-${c.id}` ? "Drafting…" : "Draft Email"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleDraft(c.id, "email")}
+                  disabled={busy === `draft-email-${c.id}`}
+                  className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {busy === `draft-email-${c.id}` ? "Drafting…" : "Draft Email"}
+                </button>
+                <button
+                  onClick={() => handleDraft(c.id, "connection")}
+                  disabled={busy === `draft-connection-${c.id}`}
+                  className="rounded-md border border-[#0a66c2] px-3 py-1.5 text-sm font-medium text-[#0a66c2] hover:bg-[#0a66c2]/5 disabled:opacity-50"
+                  title="A LinkedIn connection-request note (300-char cap)"
+                >
+                  {busy === `draft-connection-${c.id}`
+                    ? "Drafting…"
+                    : "LinkedIn Note"}
+                </button>
+                <button
+                  onClick={() => handleDraft(c.id, "dm")}
+                  disabled={busy === `draft-dm-${c.id}`}
+                  className="rounded-md border border-[#0a66c2] px-3 py-1.5 text-sm font-medium text-[#0a66c2] hover:bg-[#0a66c2]/5 disabled:opacity-50"
+                  title="A LinkedIn message to send after they accept"
+                >
+                  {busy === `draft-dm-${c.id}` ? "Drafting…" : "LinkedIn DM"}
+                </button>
+              </div>
             </div>
           ))
         )}

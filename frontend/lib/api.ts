@@ -620,6 +620,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  // LinkedIn drafts (connection note / post-accept DM). Stored as EmailDraft
+  // rows, so they reuse every /emails approval + tracking action below.
+  draftLinkedIn: (input: {
+    job_id: number;
+    contact_id: number;
+    goal_id?: number | null;
+    kind?: "connection" | "dm";
+    tone?: string;
+  }) =>
+    request<EmailDraft>("/linkedin/draft", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   getEmails: () => request<EmailDraft[]>("/emails"),
   getEmail: (id: number) => request<EmailDraft>(`/emails/${id}`),
   patchEmail: (

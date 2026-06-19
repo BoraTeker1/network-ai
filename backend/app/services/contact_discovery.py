@@ -86,6 +86,7 @@ class ManualProvider(ContactDiscoveryProvider):
                     "title": c.get("title"),
                     "company": c.get("company"),
                     "email": c.get("email"),
+                    "linkedin_url": c.get("linkedin_url"),
                     "email_confidence": c.get("email_confidence"),
                     "source": "manual",
                     "contact_type": c.get("contact_type"),

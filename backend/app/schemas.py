@@ -177,6 +177,16 @@ class GmailSendIn(BaseModel):
     confirm_send: bool = False
 
 
+# ----- LinkedIn -----
+
+class LinkedInDraftIn(BaseModel):
+    job_id: int
+    contact_id: int
+    goal_id: Optional[int] = None
+    kind: str = "connection"          # "connection" (300-char note) | "dm"
+    tone: Optional[str] = "warm_low_pressure"
+
+
 # ----- Next Move AI -----
 
 class NextMoveIn(BaseModel):

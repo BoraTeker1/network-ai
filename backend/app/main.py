@@ -15,6 +15,7 @@ from .routers import (
     goals,
     insights,
     jobs,
+    linkedin,
     messages,
     momentum,
     next_move,
@@ -45,6 +46,7 @@ app.include_router(demo.router)
 app.include_router(goals.router)
 app.include_router(contacts.router)
 app.include_router(emails.router)
+app.include_router(linkedin.router)
 app.include_router(momentum.router)
 app.include_router(next_move.router)
 app.include_router(dashboard.router)
