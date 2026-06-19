@@ -5,9 +5,13 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import {
   VIBE_CHECKLIST,
+  VIBE_DJ_SETS,
   VIBE_MOODS,
   VIBE_SPRINT_SECONDS,
   VIBE_STORAGE_KEYS,
+  djSetEmbedUrl,
+  djSetWatchUrl,
+  findDjSet,
   findMood,
   formatSprint,
 } from "@/lib/vibe";
@@ -23,6 +27,10 @@ export default function VibeModePage() {
   const [done, setDone] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // --- House set (DJ performance video, persisted) ---
+  const [djSetId, setDjSetId] = useState(VIBE_DJ_SETS[0].id);
+  const djSet = findDjSet(djSetId);
+
   // --- Checklist (persisted) ---
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
@@ -31,6 +39,8 @@ export default function VibeModePage() {
     try {
       const savedMood = localStorage.getItem(VIBE_STORAGE_KEYS.mood);
       if (savedMood) setMoodId(findMood(savedMood).id);
+      const savedDjSet = localStorage.getItem(VIBE_STORAGE_KEYS.djSet);
+      if (savedDjSet) setDjSetId(findDjSet(savedDjSet).id);
       const savedChecklist = localStorage.getItem(VIBE_STORAGE_KEYS.checklist);
       if (savedChecklist) setChecked(JSON.parse(savedChecklist));
     } catch {
@@ -60,6 +70,15 @@ export default function VibeModePage() {
     setMoodId(id);
     try {
       localStorage.setItem(VIBE_STORAGE_KEYS.mood, id);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const selectDjSet = useCallback((id: string) => {
+    setDjSetId(id);
+    try {
+      localStorage.setItem(VIBE_STORAGE_KEYS.djSet, id);
     } catch {
       /* ignore */
     }
@@ -211,6 +230,99 @@ export default function VibeModePage() {
                   {active && (
                     <div className="mt-2 text-[11px] font-medium text-blue-600">
                       ✓ Selected
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* House Sets — famous DJs actually performing (live video) */}
+      <section className="mt-8">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              House Sets — watch the legends perform
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Real live performances from house &amp; electronic icons. Great for
+              a heads-down outreach block — press play when you&apos;re ready.
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+            YouTube embed
+          </span>
+        </div>
+
+        {/* Selected performance player */}
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Now performing · {djSet.artist}
+            </div>
+            <a
+              href={djSetWatchUrl(djSet)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-blue-600 hover:underline"
+            >
+              Watch on YouTube ↗
+            </a>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            {djSet.event} · <span className="text-slate-400">{djSet.genre}</span>
+          </p>
+          <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+            <iframe
+              key={djSet.id}
+              title={`${djSet.artist} — ${djSet.event}`}
+              src={djSetEmbedUrl(djSet)}
+              width="100%"
+              height="420"
+              style={{ border: 0 }}
+              loading="lazy"
+              allow="encrypted-media; clipboard-write; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Streamed by YouTube in an embedded player and filmed by{" "}
+            {djSet.source}. Network AI hosts no audio or video and never plays it
+            automatically.
+          </p>
+        </div>
+
+        {/* DJ picker */}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {VIBE_DJ_SETS.map((s) => {
+            const active = s.id === djSetId;
+            return (
+              <button
+                key={s.id}
+                onClick={() => selectDjSet(s.id)}
+                className={`overflow-hidden rounded-lg border bg-white text-left transition ${
+                  active
+                    ? "border-blue-500 ring-2 ring-blue-200"
+                    : "border-slate-200 hover:border-blue-400"
+                }`}
+              >
+                <div className={`h-1.5 w-full bg-gradient-to-r ${s.accent}`} />
+                <div className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-900">
+                      {s.artist}
+                    </div>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                      {s.source}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">{s.event}</div>
+                  <div className="mt-1 text-[11px] text-slate-400">{s.genre}</div>
+                  {active && (
+                    <div className="mt-2 text-[11px] font-medium text-blue-600">
+                      ✓ Now playing
                     </div>
                   )}
                 </div>

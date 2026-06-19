@@ -28,6 +28,7 @@ export const VIBE_SPRINT_SECONDS = VIBE_SPRINT_MINUTES * 60;
 export const VIBE_STORAGE_KEYS = {
   mood: "vibe-mode:mood",
   checklist: "vibe-mode:checklist",
+  djSet: "vibe-mode:dj-set",
 } as const;
 
 export const VIBE_MOODS: VibeMood[] = [
@@ -77,6 +78,100 @@ export const VIBE_MOODS: VibeMood[] = [
     embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DX76Wlfdnj7AP",
   },
 ];
+
+// ---- House Sets: famous DJs *actually performing* (live video) ----
+//
+// Same guardrails as the moods above: we host nothing and never autoplay. Each
+// set is the official YouTube upload of a real live performance, embedded via
+// the privacy-enhanced youtube-nocookie domain. `watchUrl` links back to the
+// source so attribution stays honest. To swap a set, replace `youtubeId` with
+// the video id (the part after `watch?v=`). Do NOT add an autoplay parameter.
+
+export type VibeDjSet = {
+  id: string;
+  artist: string;
+  event: string; // where/what — e.g. "Cercle · Salle Wagram, Paris"
+  genre: string; // short style label
+  accent: string; // tailwind gradient
+  source: string; // channel that filmed it — e.g. "Cercle", "Boiler Room"
+  youtubeId: string;
+};
+
+export const VIBE_DJ_SETS: VibeDjSet[] = [
+  {
+    id: "black-coffee-cercle",
+    artist: "Black Coffee",
+    event: "Cercle · Salle Wagram, Paris",
+    genre: "Afro / deep house",
+    accent: "from-amber-600 to-stone-800",
+    source: "Cercle",
+    youtubeId: "SGqg_ZzThDU",
+  },
+  {
+    id: "solomun-cercle",
+    artist: "Solomun",
+    event: "Cercle · Théâtre Antique d'Orange",
+    genre: "Melodic / deep house",
+    accent: "from-rose-500 to-indigo-700",
+    source: "Cercle",
+    youtubeId: "QHDRRxKlimY",
+  },
+  {
+    id: "david-guetta-tomorrowland",
+    artist: "David Guetta",
+    event: "Tomorrowland 2024 · Mainstage",
+    genre: "House / big-room",
+    accent: "from-fuchsia-500 to-orange-500",
+    source: "David Guetta",
+    youtubeId: "g7O-7rF0Hqk",
+  },
+  {
+    id: "calvin-harris-summertime-ball",
+    artist: "Calvin Harris",
+    event: "Capital's Summertime Ball · Wembley",
+    genre: "House / electro-pop",
+    accent: "from-sky-500 to-violet-600",
+    source: "Capital",
+    youtubeId: "kHJw97ZojrY",
+  },
+  {
+    id: "peggy-gou-boiler-room",
+    artist: "Peggy Gou",
+    event: "Boiler Room x Dekmantel · Amsterdam",
+    genre: "House / electro",
+    accent: "from-pink-500 to-amber-400",
+    source: "Boiler Room",
+    youtubeId: "nKHpbiYCtDQ",
+  },
+  {
+    id: "carl-cox-tomorrowland",
+    artist: "Carl Cox",
+    event: "Tomorrowland Belgium 2019",
+    genre: "House / techno",
+    accent: "from-emerald-500 to-slate-800",
+    source: "Tomorrowland",
+    youtubeId: "FLFwpjGvWbQ",
+  },
+];
+
+/** Privacy-enhanced YouTube embed URL. No autoplay; rel=0 keeps suggestions
+ *  limited to the same channel at the end. */
+export function djSetEmbedUrl(set: VibeDjSet): string {
+  return `https://www.youtube-nocookie.com/embed/${set.youtubeId}?rel=0`;
+}
+
+/** Public YouTube watch URL for honest "watch at source" attribution. */
+export function djSetWatchUrl(set: VibeDjSet): string {
+  return `https://www.youtube.com/watch?v=${set.youtubeId}`;
+}
+
+export function defaultDjSet(): VibeDjSet {
+  return VIBE_DJ_SETS[0];
+}
+
+export function findDjSet(id: string | null | undefined): VibeDjSet {
+  return VIBE_DJ_SETS.find((s) => s.id === id) ?? defaultDjSet();
+}
 
 // The four-step sprint checklist. Each step deep-links to the page where the
 // work actually happens — Vibe Mode organizes the existing workflow, it never
