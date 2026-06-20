@@ -12,10 +12,12 @@ from .routers import (
     dashboard,
     demo,
     emails,
+    events,
     goals,
     insights,
     jobs,
     linkedin,
+    meetings,
     messages,
     momentum,
     next_move,
@@ -50,6 +52,8 @@ app.include_router(linkedin.router)
 app.include_router(momentum.router)
 app.include_router(next_move.router)
 app.include_router(dashboard.router)
+app.include_router(events.router)
+app.include_router(meetings.router)
 
 
 @app.get("/health")

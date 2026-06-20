@@ -200,6 +200,25 @@ class NextMoveIn(BaseModel):
     email_id: Optional[int] = None
 
 
+# ----- Meetings (people you actually met — presence tracking) -----
+
+class MeetingIn(BaseModel):
+    name: str
+    title: Optional[str] = None
+    company: Optional[str] = None
+    where_met: Optional[str] = None          # event/place, e.g. "JS Conf NY"
+    met_on: Optional[str] = None             # ISO date (YYYY-MM-DD); defaults to today
+    job_id: Optional[int] = None             # the opportunity this relates to
+    contact_type: Optional[str] = None       # one of CONTACT_TYPES
+    linkedin_url: Optional[str] = None
+    note: Optional[str] = None
+
+
+class MeetingPatch(BaseModel):
+    followed_up: Optional[bool] = None
+    note: Optional[str] = None
+
+
 # ----- Generic -----
 
 class StatusResponse(BaseModel):

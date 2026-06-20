@@ -80,6 +80,7 @@ MOMENTUM_EVENT_TYPES = (
     "copied",
     "sent_manual",
     "follow_up_completed",
+    "person_met",
     "reply_received",
     "referral_received",
     "interview_received",
@@ -256,6 +257,36 @@ class Contact(Base):
     source_note = Column(Text, nullable=True)
     why_relevant = Column(Text, nullable=True)
     risk_note = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    job = relationship("Job")
+
+
+class Meeting(Base):
+    """A person the user actually MET — at an event, online, or via an intro.
+
+    This is the core "presence" signal: it turns showing up into a tracked
+    relationship. Logged manually by the user (never scraped/auto-detected), it
+    powers the presence funnel and earns Momentum. Distinct from Contact, which
+    is "someone to reach out to" — a Meeting is "someone I already connected with."
+    """
+
+    __tablename__ = "meetings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
+
+    name = Column(String, nullable=False)
+    title = Column(String, nullable=True)
+    company = Column(String, nullable=True)
+    where_met = Column(String, nullable=True)       # event/place, e.g. "JS Conf NY"
+    met_on = Column(String, nullable=True)          # ISO date (YYYY-MM-DD)
+    contact_type = Column(String, nullable=True)    # one of CONTACT_TYPES
+    linkedin_url = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
+    followed_up = Column(Boolean, default=False)    # did the user follow up yet?
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

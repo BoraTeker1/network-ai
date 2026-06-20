@@ -26,6 +26,7 @@ from ..models import (
     Goal,
     Job,
     JobMatch,
+    Meeting,
     Message,
     Profile,
 )
@@ -164,6 +165,7 @@ def _pipeline_summary(db: Session) -> dict:
     but spans both outreach workflows. Deterministic counts, no estimates."""
     total_jobs = db.query(Job).count()
     strong_matches = db.query(JobMatch).filter(JobMatch.score >= strategy.STRONG_MIN).count()
+    people_met = db.query(Meeting).filter(Meeting.user_id == DEMO_USER_ID).count()
 
     messages = db.query(Message).filter(Message.user_id == DEMO_USER_ID).all()
     emails = db.query(EmailDraft).filter(EmailDraft.user_id == DEMO_USER_ID).all()
@@ -181,6 +183,7 @@ def _pipeline_summary(db: Session) -> dict:
     return {
         "jobs_found": total_jobs,
         "strong_matches": strong_matches,
+        "people_met": people_met,
         "drafts": drafts,
         "sent": sent,
         "replies": _outcome("replied"),

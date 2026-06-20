@@ -427,6 +427,7 @@ export type Mission = {
   pipeline: {
     jobs_found: number;
     strong_matches: number;
+    people_met: number;
     drafts: number;
     sent: number;
     replies: number;
@@ -436,6 +437,121 @@ export type Mission = {
   momentum: MomentumSummary;
   setup_steps: SetupStep[];
   next_setup_step: SetupStep | null;
+};
+
+// ----- Event / conference networking recommendations -----
+
+export type EventSearchQuery = {
+  label: string;
+  provider: "google" | "eventbrite" | "meetup" | "luma" | "company";
+  query: string;
+  url: string;
+  why: string;
+};
+
+export type EventRecommendation = {
+  title: string;
+  organizer: string | null;
+  event_type:
+    | "conference"
+    | "meetup"
+    | "career_fair"
+    | "hackathon"
+    | "tech_talk"
+    | "webinar"
+    | "other";
+  relevance_reason: string;
+  matched_terms: string[];
+  start_datetime: string | null;
+  end_datetime: string | null;
+  location: string | null;
+  is_online: boolean | null;
+  source_name: string;
+  source_url: string;
+  fetched_at: string;
+  freshness_label: "fresh" | "upcoming" | "stale_unknown";
+  confidence: "high" | "medium" | "low";
+  rank_score: number;
+};
+
+export type EventProviderResult = {
+  provider: string;
+  configured: boolean;
+  ok: boolean;
+  count: number;
+  note: string;
+};
+
+export type EventSearchContext = {
+  job_title: string | null;
+  company: string | null;
+  role_family: string;
+  role_family_keywords: string[];
+  matched_skills: string[];
+  location: string | null;
+  city: string | null;
+  is_remote: boolean;
+  is_remote_pref: boolean;
+  keywords: string[];
+};
+
+export type EventRecommendationsResponse = {
+  ready: boolean;
+  message: string;
+  strongest_match: RankedMatch | null;
+  search_context: EventSearchContext;
+  filters: {
+    location: string | null;
+    city: string | null;
+    is_remote: boolean;
+    radius_miles: number;
+    days_ahead: number;
+    include_online: boolean;
+    max_results: number;
+  };
+  providers: EventProviderResult[];
+  recommendations: EventRecommendation[];
+  search_links: EventSearchQuery[];
+  disclaimer: string;
+};
+
+export type EventFilters = {
+  location?: string;
+  radius_miles?: number;
+  days_ahead?: number;
+  include_online?: boolean;
+  max_results?: number;
+};
+
+// ----- Meetings (people you actually met — presence tracking) -----
+
+export type Meeting = {
+  id: number;
+  job_id: number | null;
+  name: string;
+  title: string | null;
+  company: string | null;
+  where_met: string | null;
+  met_on: string | null;
+  contact_type: string | null;
+  linkedin_url: string | null;
+  note: string | null;
+  followed_up: boolean;
+  created_at: string | null;
+  // Present only on the create response.
+  momentum?: MomentumAward | null;
+};
+
+export type MeetingInput = {
+  name: string;
+  title?: string;
+  company?: string;
+  where_met?: string;
+  met_on?: string;
+  job_id?: number | null;
+  contact_type?: string;
+  linkedin_url?: string;
+  note?: string;
 };
 
 export type OutcomesResponse = {
@@ -571,8 +687,45 @@ export const api = {
   getOutcomes: () => request<OutcomesResponse>("/outcomes"),
   getMission: () => request<Mission>("/dashboard/mission"),
 
+  // Event / conference networking recommendations (provider APIs + manual
+  // search links; never invents events, never registers or emails anyone)
+  getEventRecommendations: (filters: EventFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.location) params.set("location", filters.location);
+    if (filters.radius_miles != null)
+      params.set("radius_miles", String(filters.radius_miles));
+    if (filters.days_ahead != null)
+      params.set("days_ahead", String(filters.days_ahead));
+    if (filters.include_online != null)
+      params.set("include_online", String(filters.include_online));
+    if (filters.max_results != null)
+      params.set("max_results", String(filters.max_results));
+    const qs = params.toString();
+    return request<EventRecommendationsResponse>(
+      `/events/recommendations${qs ? `?${qs}` : ""}`
+    );
+  },
+
   // Momentum (Vibe Mode gamification)
   getMomentum: () => request<MomentumSummary>("/momentum/summary"),
+
+  // Meetings (log people you actually met; powers the presence funnel)
+  getMeetings: (jobId?: number) =>
+    request<Meeting[]>(`/meetings${jobId != null ? `?job_id=${jobId}` : ""}`),
+  logMeeting: (input: MeetingInput) =>
+    request<Meeting>("/meetings", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateMeeting: (id: number, patch: { followed_up?: boolean; note?: string }) =>
+    request<Meeting>(`/meetings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  deleteMeeting: (id: number) =>
+    request<{ status: string; id: number }>(`/meetings/${id}`, {
+      method: "DELETE",
+    }),
 
   // Next Move AI (analyze a pasted reply; never auto-reads anything)
   analyzeNextMove: (input: NextMoveInput) =>
