@@ -354,3 +354,62 @@ class MomentumEvent(Base):
     points = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ----- Curated Turkey + Remote/EU opportunity feed (additive, isolated table) --
+# Deliberately SEPARATE from Job (which powers the US matcher/messages flows). An
+# opportunity is a curated/compliant listing for Turkish junior engineers that
+# feeds the bilingual outreach copilot. No scraping of protected sites — sources
+# are curated samples, public job APIs, company pages, and manual JSON import.
+
+# Where the role sits, from a Turkey-based junior's perspective.
+OPP_TARGET_REGIONS = ("turkey", "europe", "remote", "global", "unknown")
+OPP_SENIORITY_LEVELS = ("internship", "new_grad", "junior", "mid", "senior", "unknown")
+OPP_REMOTE_POLICIES = ("remote", "hybrid", "onsite", "unknown")
+# Conservative eligibility labels for a Turkey-based candidate.
+TURKEY_APPLICABILITY_LABELS = (
+    "Strong fit for Turkey-based candidates",
+    "Possibly eligible",
+    "Unclear",
+    "Probably not eligible",
+)
+
+
+class Opportunity(Base):
+    __tablename__ = "opportunities"
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_opp_source_external"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    source = Column(String, index=True, default="curated-sample")  # provider:token (dedup scope)
+    external_id = Column(String, index=True, nullable=True)
+    source_provider = Column(String, index=True, nullable=True)     # lever/greenhouse/ashby/arbeitnow/sample/manual
+    source_confidence = Column(String, index=True, nullable=True)   # official_ats/public_api/manual_curated/sample_demo/unknown
+
+    company = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    url = Column(String, nullable=True)            # apply / listing URL (verbatim)
+    source_url = Column(String, nullable=True)
+
+    target_region = Column(String, index=True, default="unknown")   # OPP_TARGET_REGIONS
+    seniority_level = Column(String, index=True, default="unknown")  # OPP_SENIORITY_LEVELS
+    remote_policy = Column(String, default="unknown")               # OPP_REMOTE_POLICIES
+    country_scope = Column(String, nullable=True)    # e.g. "EMEA", "Worldwide", "US only"
+    accepts_turkey_based = Column(Boolean, nullable=True)  # explicit override if known
+
+    turkey_applicability_label = Column(String, index=True, nullable=True)
+    turkey_applicability_reason = Column(Text, nullable=True)
+
+    language_expectation = Column(String, nullable=True)   # e.g. "English"
+    work_auth_note = Column(Text, nullable=True)           # only if explicitly stated
+    description = Column(Text, nullable=True)
+    tags_json = Column(Text, nullable=True)                # JSON list of strings
+    raw_source_json = Column(Text, nullable=True)          # original record, for debugging
+
+    date_posted = Column(String, nullable=True)            # raw text from source
+    date_seen = Column(DateTime, default=datetime.utcnow, index=True)
+    is_sample = Column(Boolean, default=False)             # demo/sample row?
+
+    created_at = Column(DateTime, default=datetime.utcnow)

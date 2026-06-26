@@ -180,6 +180,149 @@ export type NextMoveInput = {
   email_id?: number | null;
 };
 
+// ----- Paste-a-JD bilingual outreach (Turkey → remote/EU wedge) -----
+
+export type ContactRole = {
+  role: string;
+  label: string;
+  why: string;
+  priority: number;
+};
+
+export type ManualSearchLink = { label: string; url: string };
+
+export type ContactGuidance = {
+  company: string;
+  recommended_contact_roles: ContactRole[];
+  contact_priority_order: string[];
+  manual_search_links: ManualSearchLink[];
+  note: string;
+};
+
+export type OutreachDraft = {
+  subject: string;
+  body: string;
+  language: "en" | "tr";
+  channel: "email" | "linkedin";
+  message_type: string;
+  tone: string;
+  detected_company: string | null;
+  detected_role: string | null;
+  target_region: string | null;
+  based_in: string;
+  relevant_skills: string[];
+  personalization_notes: string | null;
+  quality_checklist: Checklist;
+  risk_checklist: Checklist;
+  why_safe: string | null;
+  suggested_next_step: string | null;
+  suggested_follow_up: string;
+  contact_guidance: ContactGuidance;
+  llm_used: boolean;
+};
+
+export type OutreachPasteInput = {
+  jd_text: string;
+  contact?: { name?: string; title?: string; company?: string };
+  language?: "en" | "tr";
+  channel?: "email" | "linkedin";
+  tone?: string;
+  company?: string;
+  role?: string;
+  target_region?: "remote" | "europe" | "global" | "turkey" | null;
+  based_in?: string;
+  timezone_overlap?: string;
+  work_authorization_note?: string;
+  include_location_line?: boolean;
+  include_work_auth_line?: boolean;
+  skill_highlight?: string;
+};
+
+// ----- Curated Turkey + Remote/EU opportunity feed -----
+
+export type OutreachPrefill = {
+  company: string;
+  role: string;
+  jd_text: string;
+  target_region: "turkey" | "europe" | "remote" | "global";
+  language: "en" | "tr";
+  include_location_line: boolean;
+};
+
+export type Opportunity = {
+  id: number;
+  source: string;
+  company: string | null;
+  title: string | null;
+  location: string | null;
+  url: string | null;
+  source_url: string | null;
+  target_region: string;
+  seniority_level: string;
+  remote_policy: string;
+  country_scope: string | null;
+  turkey_applicability_label: string | null;
+  turkey_applicability_reason: string | null;
+  language_expectation: string | null;
+  work_auth_note: string | null;
+  tags: string[];
+  date_posted: string | null;
+  is_sample: boolean;
+  source_provider: string | null;
+  source_confidence: string | null;
+  outreach_prefill: OutreachPrefill;
+};
+
+export type OpportunitiesResponse = {
+  count: number;
+  applicability_labels: Record<string, string>;
+  items: Opportunity[];
+};
+
+export type OpportunityFilters = {
+  region?: string;
+  seniority?: string;
+  remote?: boolean;
+  applicability?: string;
+  tag?: string;
+  source?: string;
+  confidence?: string;
+  include_ineligible?: boolean;
+};
+
+export type OpportunitySource = {
+  id: string;
+  company_name: string;
+  ats_provider: string;
+  board_token: string | null;
+  careers_url: string;
+  country_scope: string;
+  company_category: string;
+  enabled: boolean;
+  live: boolean;
+  source_confidence: string;
+  notes: string;
+};
+
+export type RefreshSourceResult = {
+  id: string;
+  company: string;
+  provider: string;
+  status: "success" | "failed" | "skipped";
+  jobs_imported: number;
+  created?: number;
+  error?: string;
+};
+
+export type RefreshSourcesResult = {
+  sources: RefreshSourceResult[];
+  created: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  total: number;
+};
+
 export type Message = {
   id: number;
   job_id: number | null;
@@ -733,6 +876,33 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  // Paste-a-JD bilingual outreach (paste a JD you found yourself; draft TR/EN)
+  draftOutreachFromPaste: (input: OutreachPasteInput) =>
+    request<OutreachDraft>("/outreach/draft-from-paste", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  // Curated Turkey + Remote/EU opportunity feed (no scraping; seeded sample +
+  // public feeds + manual import). GET never hits the network.
+  getOpportunities: (filters: OpportunityFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.region) params.set("region", filters.region);
+    if (filters.seniority) params.set("seniority", filters.seniority);
+    if (filters.remote) params.set("remote", "true");
+    if (filters.applicability) params.set("applicability", filters.applicability);
+    if (filters.tag) params.set("tag", filters.tag);
+    if (filters.source) params.set("source", filters.source);
+    if (filters.confidence) params.set("confidence", filters.confidence);
+    if (filters.include_ineligible) params.set("include_ineligible", "true");
+    const qs = params.toString();
+    return request<OpportunitiesResponse>(`/opportunities${qs ? `?${qs}` : ""}`);
+  },
+  getOpportunitySources: () =>
+    request<{ sources: OpportunitySource[] }>("/opportunities/sources"),
+  refreshOpportunitySources: () =>
+    request<RefreshSourcesResult>("/opportunities/refresh-sources", { method: "POST" }),
 
   // Goals
   getGoals: () => request<Goal[]>("/goals"),

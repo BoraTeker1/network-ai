@@ -53,6 +53,56 @@ _SOFT_ASK_TERMS = (
     "open to",
 )
 
+# ----- Turkish equivalents (bilingual outreach for the Turkey→remote/EU wedge) --
+# Same guardrails in Turkish: never imply a fake prior relationship, never make a
+# demanding/spammy ask, keep a single low-pressure request.
+_FAKE_CLAIM_TERMS_TR = (
+    "tanışmıştık",
+    "görüşmüştük",
+    "konuşmuştuk",
+    "geçen sefer",
+    "hatırlarsınız",
+    "başvurdum",
+    "başvuru yaptım",
+)
+_AGGRESSIVE_TERMS_TR = (
+    "referans ver",
+    "beni refere et",
+    "acilen",
+    "en kısa sürede",
+    "hemen",
+    "garanti",
+    "buraya tıkla",
+    "şimdi satın al",
+)
+_SOFT_ASK_TERMS_TR = (
+    "müsait misiniz",
+    "vaktiniz olur mu",
+    "tavsiyeniz",
+    "tavsiye",
+    "kısa bir görüşme",
+    "birkaç dakika",
+    "rica etsem",
+    "mümkün mü",
+    "memnun olurum",
+    "yardımcı olabilir misiniz",
+    "merak ediyorum",
+)
+
+
+def _terms_for(language: str | None) -> tuple[tuple, tuple, tuple]:
+    """Return (fake_claim, aggressive, soft_ask) term tuples for a language.
+
+    Turkish bodies are checked against Turkish phrasing PLUS English, since role
+    and skill terms often stay in English even inside a Turkish message."""
+    if (language or "en").lower().startswith("tr"):
+        return (
+            _FAKE_CLAIM_TERMS + _FAKE_CLAIM_TERMS_TR,
+            _AGGRESSIVE_TERMS + _AGGRESSIVE_TERMS_TR,
+            _SOFT_ASK_TERMS + _SOFT_ASK_TERMS_TR,
+        )
+    return _FAKE_CLAIM_TERMS, _AGGRESSIVE_TERMS, _SOFT_ASK_TERMS
+
 
 def _skill_phrase(skills: list[str], n: int = 2) -> str:
     chosen = [s for s in (skills or []) if s][:n]
@@ -155,11 +205,12 @@ def _deterministic_email(*, profile_skills, goal, job, contact, tone) -> dict:
 
 # ----- Checklists (always computed locally on the final body) -----
 
-def quality_checklist(*, subject, body, company, role, profile_skills) -> dict:
+def quality_checklist(*, subject, body, company, role, profile_skills, language="en") -> dict:
     text = f"{subject}\n{body}".lower()
     body_words = len((body or "").split())
     matched = [s for s in (profile_skills or []) if s and s.lower() in text]
     exclamations = (body or "").count("!")
+    fake_terms, aggressive_terms, soft_terms = _terms_for(language)
 
     items = [
         {"key": "mentions_company", "label": "Mentions the company",
@@ -169,17 +220,17 @@ def quality_checklist(*, subject, body, company, role, profile_skills) -> dict:
         {"key": "mentions_skill", "label": "Mentions a relevant skill",
          "passed": len(matched) >= 1},
         {"key": "clear_ask", "label": "Has a clear ask",
-         "passed": ("?" in (body or "")) or any(t in text for t in _SOFT_ASK_TERMS)},
+         "passed": ("?" in (body or "")) or any(t in text for t in soft_terms)},
         {"key": "under_180_words", "label": f"Under {WORD_LIMIT} words",
          "passed": 0 < body_words <= WORD_LIMIT},
         {"key": "no_fake_claim", "label": "No fake/over-personalized claim",
-         "passed": not any(t in text for t in _FAKE_CLAIM_TERMS)},
+         "passed": not any(t in text for t in fake_terms)},
         {"key": "low_pressure", "label": "Low-pressure tone",
-         "passed": any(t in text for t in _SOFT_ASK_TERMS)
-         and not any(t in text for t in _AGGRESSIVE_TERMS)},
+         "passed": any(t in text for t in soft_terms)
+         and not any(t in text for t in aggressive_terms)},
         {"key": "not_spammy", "label": "Not spammy",
          "passed": exclamations <= 1
-         and not any(t in text for t in _AGGRESSIVE_TERMS)},
+         and not any(t in text for t in aggressive_terms)},
     ]
     passed = sum(1 for i in items if i["passed"])
     return {"items": items, "passed": passed, "total": len(items)}
@@ -269,7 +320,7 @@ def generate_email(
             tone=tone,
         )
         try:
-            data = llm_client.generate_json_with_openai(prompt)
+            data = llm_client.generate_json(prompt)
             subject = str(data.get("subject") or "").strip()
             body = str(data.get("body") or "").strip()
             personalization_notes = str(data.get("personalization_notes") or "").strip()

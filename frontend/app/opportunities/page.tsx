@@ -1,0 +1,244 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  api,
+  Opportunity,
+  OpportunityFilters,
+  OpportunitySource,
+} from "@/lib/api";
+import { PageHeader, ErrorBanner, EmptyState, SectionLabel } from "@/components/ui";
+
+const REGIONS = ["", "turkey", "remote", "europe", "global"];
+const REGION_LABEL: Record<string, string> = {
+  "": "All regions", turkey: "Turkey", remote: "Remote", europe: "Europe", global: "Global",
+};
+const SENIORITY = ["", "internship", "new_grad", "junior"];
+const SENIORITY_LABEL: Record<string, string> = {
+  "": "All levels", internship: "Internship", new_grad: "New grad", junior: "Junior",
+};
+const APPLICABILITY = ["", "strong", "possible", "unclear", "no"];
+const APPLICABILITY_LABEL: Record<string, string> = {
+  "": "Eligible (default)", strong: "Strong fit", possible: "Possibly eligible",
+  unclear: "Unclear", no: "Probably not eligible",
+};
+const CONFIDENCE = ["", "official_ats", "public_api", "manual_curated", "sample_demo"];
+const CONFIDENCE_LABEL: Record<string, string> = {
+  "": "Any source", official_ats: "Official ATS", public_api: "Public API",
+  manual_curated: "Manual", sample_demo: "Sample",
+};
+
+function applicabilityStyle(label: string | null): string {
+  if (label?.startsWith("Strong")) return "bg-green-100 text-green-800";
+  if (label === "Possibly eligible") return "bg-amber-100 text-amber-800";
+  if (label === "Unclear") return "bg-slate-100 text-slate-600";
+  return "bg-rose-100 text-rose-700";
+}
+function confidenceStyle(c: string | null): string {
+  if (c === "official_ats") return "bg-emerald-50 text-emerald-700";
+  if (c === "public_api") return "bg-sky-50 text-sky-700";
+  if (c === "manual_curated") return "bg-slate-100 text-slate-600";
+  return "bg-amber-50 text-amber-700"; // sample
+}
+
+const chip = "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
+const select =
+  "rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none";
+
+export default function OpportunitiesPage() {
+  const router = useRouter();
+  const [items, setItems] = useState<Opportunity[]>([]);
+  const [sources, setSources] = useState<OpportunitySource[]>([]);
+  const [showSources, setShowSources] = useState(false);
+  const [filters, setFilters] = useState<OpportunityFilters>({});
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getOpportunities({ ...filters, remote: remoteOnly });
+      setItems(res.items);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load opportunities.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    api.getOpportunitySources().then((r) => setSources(r.sources)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, remoteOnly]);
+
+  async function refresh() {
+    setRefreshing(true);
+    setNotice(null);
+    try {
+      const r = await api.refreshOpportunitySources();
+      setNotice(
+        `Imported ${r.created} new listings · ${r.succeeded} sources live, ` +
+          `${r.failed} failed, ${r.skipped} skipped (manual/disabled).`
+      );
+      await load();
+    } catch {
+      setNotice("Couldn't refresh live sources; the curated feed still works.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  function draftOutreach(opp: Opportunity) {
+    sessionStorage.setItem("outreach_prefill", JSON.stringify(opp.outreach_prefill));
+    router.push("/outreach");
+  }
+
+  const liveSources = sources.filter((s) => s.live);
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-5 px-6 py-8">
+      <PageHeader
+        title="Opportunities for Turkish junior engineers"
+        subtitle="Turkey-based, remote, European, and global roles a Turkey-based junior can realistically apply to — each flows into the bilingual outreach copilot."
+        action={
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "Refresh live sources"}
+          </button>
+        }
+      />
+
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        Sources are <strong>companies&apos; official public ATS APIs</strong> (Lever/Greenhouse/Ashby),
+        public job APIs, a labelled sample seed, and manual import — <strong>no scraping</strong> of
+        Kariyer.net, LinkedIn, or any protected site. Eligibility labels are{" "}
+        <strong>conservative guesses</strong>; always verify on the company page before applying.
+      </div>
+
+      {/* Source registry status */}
+      <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+        <button
+          onClick={() => setShowSources((s) => !s)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span className="font-medium text-slate-800">
+            Live sources: {liveSources.map((s) => s.company_name).join(", ") || "—"}
+          </span>
+          <span className="text-xs text-slate-500">{showSources ? "hide" : "show all"}</span>
+        </button>
+        {showSources && (
+          <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+            {sources.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-2 text-xs">
+                <span className={s.live ? "text-emerald-700" : "text-slate-400"}>
+                  {s.live ? "● live" : "○ manual"}
+                </span>
+                <span className="font-medium text-slate-700">{s.company_name}</span>
+                <span className="text-slate-400">
+                  {s.ats_provider} · {s.country_scope} · {s.company_category}
+                </span>
+                {!s.live && (
+                  <a href={s.careers_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    careers ↗
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
+        <select className={select} value={filters.region ?? ""} onChange={(e) => setFilters((f) => ({ ...f, region: e.target.value || undefined }))}>
+          {REGIONS.map((r) => <option key={r} value={r}>{REGION_LABEL[r]}</option>)}
+        </select>
+        <select className={select} value={filters.seniority ?? ""} onChange={(e) => setFilters((f) => ({ ...f, seniority: e.target.value || undefined }))}>
+          {SENIORITY.map((s) => <option key={s} value={s}>{SENIORITY_LABEL[s]}</option>)}
+        </select>
+        <select className={select} value={filters.applicability ?? ""} onChange={(e) => setFilters((f) => ({ ...f, applicability: e.target.value || undefined }))}>
+          {APPLICABILITY.map((a) => <option key={a} value={a}>{APPLICABILITY_LABEL[a]}</option>)}
+        </select>
+        <select className={select} value={filters.confidence ?? ""} onChange={(e) => setFilters((f) => ({ ...f, confidence: e.target.value || undefined }))}>
+          {CONFIDENCE.map((c) => <option key={c} value={c}>{CONFIDENCE_LABEL[c]}</option>)}
+        </select>
+        <label className="flex items-center gap-1.5 text-sm text-slate-700">
+          <input type="checkbox" checked={remoteOnly} onChange={(e) => setRemoteOnly(e.target.checked)} />
+          Remote only
+        </label>
+        {!loading && <span className="ml-auto text-xs text-slate-500">{items.length} roles</span>}
+      </div>
+
+      {notice && <p className="text-sm text-slate-600">{notice}</p>}
+      <ErrorBanner message={error} />
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : items.length === 0 ? (
+        <EmptyState title="No matching opportunities" description="Try clearing filters or refreshing live sources." />
+      ) : (
+        <div className="space-y-3">
+          {items.map((opp) => (
+            <div key={opp.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-900">{opp.title}</div>
+                  <div className="text-sm text-slate-600">
+                    {opp.company}{opp.location ? ` · ${opp.location}` : ""}
+                  </div>
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${applicabilityStyle(opp.turkey_applicability_label)}`}>
+                  {opp.turkey_applicability_label}
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-slate-500">{opp.turkey_applicability_reason}</p>
+
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className={chip}>{REGION_LABEL[opp.target_region] ?? opp.target_region}</span>
+                <span className={chip}>{opp.seniority_level.replace("_", " ")}</span>
+                <span className={chip}>{opp.remote_policy}</span>
+                {opp.source_confidence && (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${confidenceStyle(opp.source_confidence)}`}>
+                    {CONFIDENCE_LABEL[opp.source_confidence] ?? opp.source_confidence}
+                  </span>
+                )}
+                {opp.source_provider && <span className={chip}>{opp.source_provider}</span>}
+                {opp.language_expectation && <span className={chip}>{opp.language_expectation}</span>}
+                {opp.tags.slice(0, 5).map((t) => (
+                  <span key={t} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{t}</span>
+                ))}
+              </div>
+
+              {opp.work_auth_note && (
+                <p className="mt-2 text-xs text-slate-500">
+                  <SectionLabel>Work authorization</SectionLabel> {opp.work_auth_note}
+                </p>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button onClick={() => draftOutreach(opp)} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+                  Draft outreach
+                </button>
+                {opp.url && (
+                  <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                    Open application ↗
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

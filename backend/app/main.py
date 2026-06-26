@@ -21,6 +21,8 @@ from .routers import (
     messages,
     momentum,
     next_move,
+    opportunities,
+    outreach,
     profile,
 )
 
@@ -51,6 +53,8 @@ app.include_router(emails.router)
 app.include_router(linkedin.router)
 app.include_router(momentum.router)
 app.include_router(next_move.router)
+app.include_router(outreach.router)
+app.include_router(opportunities.router)
 app.include_router(dashboard.router)
 app.include_router(events.router)
 app.include_router(meetings.router)

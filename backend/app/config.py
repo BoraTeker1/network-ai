@@ -22,15 +22,39 @@ def _get(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
 
 
-# ----- LLM (OpenAI Responses API only) -----
+# ----- LLM provider selection -----
+# Claude (Anthropic) is the primary provider. OpenAI is kept as a secondary
+# fallback. With no key for either, the app uses deterministic templates.
+
+
+def get_llm_provider() -> str:
+    """Preferred provider: 'anthropic' (default) or 'openai'."""
+    return _get("LLM_PROVIDER", "anthropic").lower()
+
+
+# ----- Anthropic (Claude — primary) -----
+
+def get_anthropic_api_key() -> str:
+    """Raw key — for internal use by the LLM client ONLY. Never return/log this."""
+    return _get("ANTHROPIC_API_KEY")
+
+
+def get_anthropic_model() -> str:
+    # Default to the latest, most capable Claude model. Override via env to trade
+    # cost/latency (e.g. claude-sonnet-4-6, claude-haiku-4-5).
+    return _get("ANTHROPIC_MODEL", "claude-opus-4-8")
+
+
+def has_anthropic() -> bool:
+    """True when an Anthropic key is present (the default/primary provider)."""
+    return bool(get_anthropic_api_key())
+
+
+# ----- OpenAI (secondary / fallback) -----
 
 def get_openai_api_key() -> str:
     """Raw key — for internal use by the LLM client ONLY. Never return/log this."""
     return _get("OPENAI_API_KEY")
-
-
-def get_llm_provider() -> str:
-    return _get("LLM_PROVIDER", "openai").lower()
 
 
 def get_openai_model() -> str:
@@ -38,8 +62,13 @@ def get_openai_model() -> str:
 
 
 def has_openai() -> bool:
-    """True only when provider is openai AND a key is present."""
-    return get_llm_provider() == "openai" and bool(get_openai_api_key())
+    """True only when an OpenAI key is present."""
+    return bool(get_openai_api_key())
+
+
+def has_llm() -> bool:
+    """True when ANY supported LLM provider is configured."""
+    return has_anthropic() or has_openai()
 
 
 # ----- Contact discovery providers -----

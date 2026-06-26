@@ -62,6 +62,11 @@ def run_lightweight_migrations() -> None:
             "is_closed": "ALTER TABLE jobs ADD COLUMN is_closed BOOLEAN DEFAULT 0",
             "discovered_at": "ALTER TABLE jobs ADD COLUMN discovered_at DATETIME",
         },
+        # Source provenance for the curated opportunity feed.
+        "opportunities": {
+            "source_provider": "ALTER TABLE opportunities ADD COLUMN source_provider VARCHAR",
+            "source_confidence": "ALTER TABLE opportunities ADD COLUMN source_confidence VARCHAR",
+        },
     }
 
     statements: list[str] = []

@@ -1,45 +1,55 @@
 # Network AI
 
-> **One-line pitch:** A permission-based networking copilot that turns new job
-> postings into working actions — for new grads and international students.
+> **One-line pitch:** A bilingual (Turkish/English) referral & outreach copilot
+> for Turkish junior software engineers targeting Turkey, remote, European, and
+> global tech roles.
 
-Network AI helps you run a focused, honest job-search outreach process. It
-ingests new-grad jobs, ranks them against your resume profile, drafts outreach
-messages, and tracks every contact through a lightweight CRM pipeline — all
-while keeping you in full control. The product works like Cursor: **AI
-proposes, you review, approve, edit, copy, and send everything yourself.**
+Network AI helps Turkish junior engineers and CS new grads (1) find
+**Turkey-relevant opportunities** — Turkey-based, remote, EMEA/Europe, and global
+remote roles they can realistically apply to — (2) judge whether a Turkey-based
+candidate can apply, (3) identify who to contact, (4) generate honest
+Turkish/English outreach, and (5) track manual follow-up. It works like Cursor:
+**AI proposes, you review, approve, edit, copy, and send everything yourself.**
 
-A narrative version of everything below lives at **`/pitch`** in the running app
-(useful as a demo/investor link).
+It is **not** a U.S. new-grad platform, **not** "Kariyer.net with AI," and **not**
+a generic global job board — it's a narrow workflow tool for the Turkey →
+remote/EU job hunt. The default journey starts at **`/opportunities`** and flows
+into **`/outreach`**. (A legacy U.S. new-grad matching layer still exists in the
+codebase but is off the primary navigation.)
+
+A narrative version lives at **`/pitch`** in the running app.
 
 ---
 
 ## Investor demo summary
 
 ### Problem
-New grads and international students don't lose offers because they can't code —
-they lose them because applications vanish into ATS black holes. Referrals and
-warm intros convert; most students don't know who to contact, what to say, or
-when to follow up.
+Turkish juniors and new grads don't lose interviews because they can't code —
+cold applications vanish into ATS black holes. In Turkey referrals matter even
+more than in most markets, yet early-career engineers don't know *who* to
+contact, *what* to say in English without sounding cringe, or whether a
+Turkey-based candidate can even apply to a given remote/EU role.
 
 ### Why now
-Auto-apply tools flooded job boards, so a single posting draws thousands of
-one-click applications within hours. Recruiters respond by leaning even harder on
-referrals. The edge has shifted from *applying faster* to *networking better* —
-and auto-apply is the wrong tool for that.
+ICT graduates have Turkey's highest emigration rate, and a "virtual brain drain"
+is growing — engineers in Istanbul working remotely for European and global teams
+for EUR/USD pay. Auto-apply flooded the boards, so the edge shifted from
+*applying faster* to *networking better* — exactly where no Turkish platform
+helps the individual.
 
 ### Solution
-Network AI is the **networking layer**, not another auto-apply bot:
+Network AI is the **personal outreach workflow layer** for the Turkey → remote/EU
+hunt:
 
-- Ranks fresh new-grad roles against your resume with a transparent rubric.
-- Labels each role (**Strong Target → Worth Networking → Low Priority → Poor
-  Fit**) and gives a concrete **next best action**.
-- Produces a deterministic **outreach strategy**: who to contact first, how many
-  people, what tone, advice vs. referral, and a step sequence.
-- Drafts four message types with a **quality checklist** that flags fake
-  personalization and weak asks.
-- Tracks the funnel: **Jobs → Strong matches → Drafts → Sent → Replies →
-  Interviews**, plus follow-ups and outcomes.
+- Curates **Turkey-relevant opportunities** (Turkey / remote / EMEA / global) from
+  companies' official public ATS APIs, public job feeds, and manual curation.
+- Labels each role with a conservative **Turkey-applicability** verdict
+  (**Strong fit → Possibly eligible → Unclear → Probably not eligible**) and a
+  reason; US-only / EU-citizenship-only roles are hidden by default.
+- Tells you **who to contact** with manual search links.
+- Drafts honest **bilingual (TR/EN) outreach** personalized with your real skills,
+  with a quality checklist and optional Turkey/CET + work-authorization framing.
+- Tracks manual follow-up — you approve and send everything yourself.
 
 ### Differentiation (why it's not a spam tool)
 Copilot, not autopilot: **no scraping, no auto-send, no browser automation, no
@@ -88,9 +98,11 @@ features degrade gracefully when blank.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `LLM_PROVIDER` | LLM provider (only `openai` supported) | `openai` |
-| `OPENAI_API_KEY` | Enables LLM drafting via the Responses API | _(blank → fallback)_ |
-| `OPENAI_MODEL` | Model id for the Responses API | `gpt-4.1-mini` |
+| `LLM_PROVIDER` | Preferred provider (`anthropic` or `openai`) | `anthropic` |
+| `ANTHROPIC_API_KEY` | Enables LLM drafting via Claude (Messages API) | _(blank → fallback)_ |
+| `ANTHROPIC_MODEL` | Claude model id | `claude-opus-4-8` |
+| `OPENAI_API_KEY` | Optional fallback provider (Responses API) | _(blank → off)_ |
+| `OPENAI_MODEL` | Model id for the OpenAI Responses API | `gpt-4.1-mini` |
 | `HUNTER_API_KEY` | Optional compliant discovery provider | _(blank → off)_ |
 | `PDL_API_KEY` | Optional compliant discovery provider | _(blank → off)_ |
 | `GMAIL_SEND_ENABLED` | Must be `true` to even consider sending | `false` |
@@ -196,6 +208,33 @@ staying strictly permission-based:
 
 ---
 
+## Opportunities feed (`/opportunities`)
+
+A curated feed of **Turkey + Remote/EU roles for junior Turkish engineers** that
+flows directly into the outreach copilot. It is **not** a generic job board.
+
+- **Compliant sources only.** A curated **sample** seed (clearly labelled in the
+  UI); **real Turkish-company listings** via their official public Lever
+  job-board APIs (`POST /opportunities/refresh-turkish-sources` — e.g. Dream
+  Games, Codeway; add more by board token in `LEVER_TURKISH_COMPANIES`); public
+  EU job-board APIs (Arbeitnow — `POST /opportunities/refresh-public-sources`);
+  and a manual JSON import endpoint (`POST /opportunities/import`). These are the
+  official embed APIs companies publish — **no scraping** of LinkedIn,
+  Kariyer.net, Youthall, Techcareer, Coderspace, or any protected site; no
+  browser automation, no auto-apply, no auto-send.
+- **`GET /opportunities` never makes a network call** — it serves stored rows
+  (seeded on first use). Fetching public listings is a separate, resilient action
+  (`POST /opportunities/refresh-public-sources`); if it fails, the curated feed
+  still works.
+- **Conservative "Turkey-applicability" label** on every role — *Strong fit /
+  Possibly eligible / Unclear / Probably not eligible* — with a one-line reason.
+  It never claims eligibility unless the listing's text supports it (US-work-auth
+  or EU-citizenship-only roles are flagged *Probably not eligible*). **Always
+  verify eligibility on the company page** — the label is a guess, not advice.
+- **"Draft outreach"** on a role prefills the `/outreach` copilot (company, role,
+  description, target region, and language default — Turkish for domestic roles,
+  English for remote/EU/global, with the Turkey/CET line on for remote/EU).
+
 ## Tech stack
 
 | Layer     | Technology                                            |
@@ -203,10 +242,12 @@ staying strictly permission-based:
 | Backend   | FastAPI, SQLAlchemy, SQLite, Pydantic (Python 3.11+)  |
 | Frontend  | Next.js 14 (App Router), React 18, TypeScript, Tailwind |
 | Matching  | Deterministic keyword scoring (no LLM)                |
-| Messaging | Deterministic templates + quality checklist (no LLM)  |
+| Messaging | Claude (Anthropic) drafting + deterministic checklist |
 
-Everything is deterministic and offline — there are **no LLM API calls** in
-this MVP.
+Matching is deterministic and offline. Message/email/outreach **drafting** uses
+the **Claude Messages API** when `ANTHROPIC_API_KEY` is set, and falls back to
+deterministic templates otherwise — so every AI feature degrades gracefully with
+no key. The `llm_used` flag on each draft tells you which path produced it.
 
 ---
 

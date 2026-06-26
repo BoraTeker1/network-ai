@@ -57,7 +57,7 @@ def test_llm_connection_over_limit_falls_back(monkeypatch):
     too_long = "x" * (linkedin_generator.CONNECTION_CHAR_LIMIT + 50)
     monkeypatch.setattr(
         llm_client,
-        "generate_json_with_openai",
+        "generate_json",
         lambda _p: {"body": too_long, "personalization_notes": "n"},
     )
     result = linkedin_generator.generate_linkedin(

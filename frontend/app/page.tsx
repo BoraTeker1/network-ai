@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
-// The dashboard is the app's command center. Route the homepage there so the
-// first thing a user sees is "Today's Networking Mission". /pitch stays separate.
+// Turkey → remote/EU focus: the default journey starts at the opportunity feed,
+// which flows into the outreach copilot. /pitch and the legacy /dashboard remain
+// reachable directly.
 export default function Home() {
-  redirect("/dashboard");
+  redirect("/opportunities");
 }

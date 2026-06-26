@@ -238,7 +238,7 @@ def generate_linkedin(
             tone=tone,
         )
         try:
-            data = llm_client.generate_json_with_openai(prompt)
+            data = llm_client.generate_json(prompt)
             body = str(data.get("body") or "").strip()
             personalization_notes = str(data.get("personalization_notes") or "").strip()
             if not body:

@@ -424,7 +424,7 @@ def analyze_reply(*, reply_text: str, context: dict) -> dict:
 
     if llm_client.llm_available():
         try:
-            data = llm_client.generate_json_with_openai(
+            data = llm_client.generate_json(
                 _build_prompt(
                     reply_text=reply_text, company=company, role=role,
                     contact_name=contact_name, contact_title=contact_title,

@@ -1,9 +1,10 @@
-"""OpenAI client wrapper — Responses API ONLY.
+"""LLM client wrapper — Claude (Anthropic) primary, OpenAI as fallback.
 
 Hard rules (enforced by code review, not just convention):
-- Uses ONLY the Responses API (`client.responses.create`).
-- Does NOT use Chat Completions, Assistants, Files, Vector Stores, or embeddings.
-- Runs only in the backend. The API key is read from env via app.config and is
+- Claude is called via the official Anthropic SDK Messages API
+  (`client.messages.create`). OpenAI, when used, goes through the Responses API
+  only (no Chat Completions / Assistants / Files / Vector Stores / embeddings).
+- Runs only in the backend. API keys are read from env via app.config and are
   NEVER logged, printed, returned, or included in any exception message.
 - Any failure raises LLMError; callers fall back to deterministic generation.
 """
@@ -13,14 +14,19 @@ import re
 
 from .. import config
 
+_STRICT_JSON_INSTRUCTIONS = (
+    "You are a careful, honest writing assistant. Respond with STRICT JSON "
+    "only — no prose, no markdown fences."
+)
+
 
 class LLMError(Exception):
     """Raised on any LLM unavailability/failure. Messages are key-free."""
 
 
 def llm_available() -> bool:
-    """True when an OpenAI key + provider are configured (no network call)."""
-    return config.has_openai()
+    """True when a Claude or OpenAI key is configured (no network call)."""
+    return config.has_llm()
 
 
 def _strip_code_fences(text: str) -> str:
@@ -45,15 +51,48 @@ def _extract_json(text: str) -> dict:
         raise
 
 
-def generate_json_with_openai(prompt: str) -> dict:
-    """Send `prompt` to the OpenAI Responses API and return parsed JSON.
+def _validate_json(text: str) -> dict:
+    if not text or not text.strip():
+        raise LLMError("LLM returned an empty response")
+    try:
+        data = _extract_json(text)
+    except (ValueError, TypeError):
+        raise LLMError("LLM response was not valid JSON") from None
+    if not isinstance(data, dict):
+        raise LLMError("LLM response JSON was not an object")
+    return data
 
-    Raises LLMError if the key is missing, the SDK isn't installed, the call
-    fails, or the response isn't valid JSON. The raw key is never surfaced.
-    """
-    if not llm_available():
-        raise LLMError("OpenAI is not configured")
 
+def _generate_with_anthropic(prompt: str) -> dict:
+    """Send `prompt` to Claude via the Anthropic Messages API; return parsed JSON."""
+    try:
+        from anthropic import Anthropic
+    except ImportError as exc:  # pragma: no cover - dependency guard
+        raise LLMError("anthropic package not installed") from exc
+
+    try:
+        client = Anthropic(api_key=config.get_anthropic_api_key())
+        response = client.messages.create(
+            model=config.get_anthropic_model(),
+            max_tokens=2000,
+            system=_STRICT_JSON_INSTRUCTIONS,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # Join all text blocks in the response content.
+        text = "".join(
+            block.text for block in response.content if getattr(block, "type", None) == "text"
+        )
+    except LLMError:
+        raise
+    except Exception as exc:
+        # Never echo exception detail verbatim — keep it generic and key-free.
+        raise LLMError(f"Anthropic request failed: {type(exc).__name__}") from None
+
+    return _validate_json(text)
+
+
+def _generate_with_openai(prompt: str) -> dict:
+    """Send `prompt` to the OpenAI Responses API and return parsed JSON."""
     try:
         from openai import OpenAI
     except ImportError as exc:  # pragma: no cover - dependency guard
@@ -65,25 +104,25 @@ def generate_json_with_openai(prompt: str) -> dict:
         response = client.responses.create(
             model=config.get_openai_model(),
             input=prompt,
-            instructions=(
-                "You are a careful writing assistant. Respond with STRICT JSON "
-                "only — no prose, no markdown fences."
-            ),
+            instructions=_STRICT_JSON_INSTRUCTIONS,
         )
         text = response.output_text
+    except LLMError:
+        raise
     except Exception as exc:
-        # Never echo the exception detail verbatim to callers/logs — it could
-        # in theory contain request context. Keep it generic and key-free.
         raise LLMError(f"OpenAI request failed: {type(exc).__name__}") from None
 
-    if not text or not text.strip():
-        raise LLMError("OpenAI returned an empty response")
+    return _validate_json(text)
 
-    try:
-        data = _extract_json(text)
-    except (ValueError, TypeError) as exc:
-        raise LLMError("OpenAI response was not valid JSON") from None
 
-    if not isinstance(data, dict):
-        raise LLMError("OpenAI response JSON was not an object")
-    return data
+def generate_json(prompt: str) -> dict:
+    """Generate strict JSON from the configured provider (Claude first).
+
+    Raises LLMError if no provider is configured, the SDK isn't installed, the
+    call fails, or the response isn't valid JSON. Raw keys are never surfaced.
+    """
+    if config.has_anthropic():
+        return _generate_with_anthropic(prompt)
+    if config.has_openai():
+        return _generate_with_openai(prompt)
+    raise LLMError("No LLM provider is configured")

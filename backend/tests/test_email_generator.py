@@ -27,7 +27,7 @@ def test_fallback_when_llm_raises(monkeypatch):
     def _boom(_prompt):
         raise llm_client.LLMError("simulated failure")
 
-    monkeypatch.setattr(llm_client, "generate_json_with_openai", _boom)
+    monkeypatch.setattr(llm_client, "generate_json", _boom)
     result = email_generator.generate_email(
         profile_skills=["Python"], experience_summary="x",
         goal=GOAL, job=JOB, contact=CONTACT, tone=None,

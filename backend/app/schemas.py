@@ -200,6 +200,45 @@ class NextMoveIn(BaseModel):
     email_id: Optional[int] = None
 
 
+# ----- Paste-a-JD bilingual outreach (Turkey → remote/EU wedge) -----
+
+class OutreachContactIn(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    company: Optional[str] = None
+
+
+class OutreachPasteIn(BaseModel):
+    # The job description the user pasted in manually (never scraped).
+    jd_text: str
+    contact: OutreachContactIn = OutreachContactIn()
+    language: str = "en"             # "en" | "tr"
+    channel: str = "email"           # "email" | "linkedin"
+    tone: Optional[str] = "warm_low_pressure"
+
+    # Optional explicit company/role (else inferred from the pasted JD).
+    company: Optional[str] = None
+    role: Optional[str] = None
+
+    # Remote/EU + visa/timezone framing (all opt-in; nothing is invented).
+    target_region: Optional[str] = None        # "remote" | "europe" | "global" | "turkey"
+    based_in: Optional[str] = "Turkey"
+    timezone_overlap: Optional[str] = None      # e.g. "Istanbul time with CET overlap"
+    work_authorization_note: Optional[str] = None  # user-provided text only
+    include_location_line: bool = False
+    include_work_auth_line: bool = False
+    skill_highlight: Optional[str] = None       # optional user override line
+
+
+# ----- Opportunities (curated Turkey + remote/EU feed) -----
+
+class OpportunityImportIn(BaseModel):
+    # Permissive: accepts raw curated/company-page records pasted as JSON.
+    jobs: List[dict]
+    source: Optional[str] = "manual-import"
+    is_sample: bool = False
+
+
 # ----- Meetings (people you actually met — presence tracking) -----
 
 class MeetingIn(BaseModel):
