@@ -10,7 +10,7 @@ and sends manually. No scraping, no auto-send.
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -19,6 +19,17 @@ from ..schemas import OutreachPasteIn
 from ..services import outreach
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
+
+
+@router.get("/contact-guidance")
+def contact_guidance(
+    company: str = Query("", description="Company to suggest contacts at."),
+    language: str = Query("en"),
+):
+    """Who to contact at a company + safe manual search links — available BEFORE
+    drafting, so the user can find a real person first, then draft to them. Builds
+    URL strings only: no network call, no scraping, no auto-contact."""
+    return outreach.contact_guidance(company, "tr" if language.startswith("tr") else "en")
 
 
 def _profile_skills(db: Session) -> tuple[list[str], str | None]:

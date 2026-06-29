@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, OutreachDraft, Checklist } from "@/lib/api";
+import { api, OutreachDraft, Checklist, ContactGuidance } from "@/lib/api";
 import {
   PageHeader,
   ErrorBanner,
@@ -106,6 +106,12 @@ export default function OutreachPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
+  // "Who to contact" guidance, loaded up-front so the user finds a real person
+  // BEFORE drafting (then pastes the name above and drafts to them).
+  const [guidance, setGuidance] = useState<ContactGuidance | null>(null);
+  const [guidanceLoading, setGuidanceLoading] = useState(false);
+  const [contactSaved, setContactSaved] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -117,7 +123,11 @@ export default function OutreachPage() {
     try {
       const p = JSON.parse(raw);
       if (p.jd_text) setJdText(p.jd_text);
-      if (p.company) setCompany(p.company);
+      const lang: Language = p.language === "tr" ? "tr" : "en";
+      if (p.company) {
+        setCompany(p.company);
+        loadGuidance(p.company, lang); // show who-to-contact straight away
+      }
       if (p.role) setRole(p.role);
       if (p.language === "tr" || p.language === "en") setLanguage(p.language);
       if (["remote", "europe", "global", "turkey"].includes(p.target_region))
@@ -130,6 +140,39 @@ export default function OutreachPage() {
     }
     sessionStorage.removeItem("outreach_prefill");
   }, []);
+
+  async function loadGuidance(co = company, lang = language) {
+    co = co.trim();
+    if (!co) return;
+    setGuidanceLoading(true);
+    try {
+      setGuidance(await api.getContactGuidance(co, lang));
+    } catch {
+      /* guidance is a non-essential helper — never block the flow on it */
+    } finally {
+      setGuidanceLoading(false);
+    }
+  }
+
+  async function saveContact() {
+    if (!name.trim()) {
+      setError("Add the contact's name first (find one via the search links).");
+      return;
+    }
+    setError(null);
+    try {
+      await api.addManualContact({
+        name: name.trim(),
+        title: title.trim() || undefined,
+        company: company.trim() || undefined,
+        source_note: "Found via the outreach copilot's search links.",
+      });
+      setContactSaved(true);
+      setNotice("Saved to your contacts.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the contact.");
+    }
+  }
 
   async function generate() {
     if (!jdText.trim()) {
@@ -178,7 +221,7 @@ export default function OutreachPage() {
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
       <PageHeader
         title="Outreach copilot"
-        subtitle="For Turkish engineers targeting Turkey, remote, European, or global roles. Paste a job you found (or start one from Opportunities), name a person to reach out to, and get an honest, low-pressure draft in English or Turkish — personalized with your saved profile skills. You review, edit, copy, and send it yourself."
+        subtitle="For Turkish engineers targeting Turkey, remote, European, or global roles. Paste a job you found (or start one from Opportunities), find the right people to contact in two clicks, then get an honest, low-pressure draft in English or Turkish — personalized with your saved profile skills. You review, edit, copy, and send it yourself."
       />
 
       <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
@@ -196,16 +239,77 @@ export default function OutreachPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company" className={input} />
+          <input value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => loadGuidance()} placeholder="Company" className={input} />
           <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role title (optional)" className={input} />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Contact name" className={input} />
+          <input value={name} onChange={(e) => { setName(e.target.value); setContactSaved(false); }} placeholder="Contact name" className={input} />
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Their title (optional)" className={input} />
         </div>
+
+        {/* Who to contact — surfaced BEFORE drafting so the user finds a real
+            person first, then pastes the name above and drafts to them. */}
+        {(guidance || guidanceLoading) && (
+          <div className="space-y-3 rounded-md border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Who to contact{guidance?.company ? ` at ${guidance.company}` : ""}
+              </h3>
+              {name.trim() && (
+                <button
+                  type="button"
+                  onClick={saveContact}
+                  className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {contactSaved ? "Saved ✓" : "Save to my contacts"}
+                </button>
+              )}
+            </div>
+            {guidanceLoading && !guidance ? (
+              <p className="text-xs text-slate-500">Finding the right roles…</p>
+            ) : guidance ? (
+              <>
+                <p className="text-xs text-slate-500">{guidance.note}</p>
+                <ol className="space-y-1.5">
+                  {guidance.recommended_contact_roles
+                    .slice()
+                    .sort((a, b) => a.priority - b.priority)
+                    .map((r) => (
+                      <li key={r.role} className="flex gap-2 text-sm">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                          {r.priority}
+                        </span>
+                        <div>
+                          <span className="font-medium text-slate-800">{r.label}</span>
+                          <span className="text-slate-500"> — {r.why}</span>
+                        </div>
+                      </li>
+                    ))}
+                </ol>
+                <div>
+                  <SectionLabel>Search for a name, then paste it above</SectionLabel>
+                  <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                    {guidance.manual_search_links.map((l) => (
+                      <li key={l.url}>
+                        <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                          {l.label} ↗
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <SectionLabel>Language</SectionLabel>
-            <Toggle value={language} options={["en", "tr"]} onChange={setLanguage} labels={LANG_LABEL} />
+            <Toggle
+              value={language}
+              options={["en", "tr"]}
+              onChange={(l) => { setLanguage(l); if (guidance) loadGuidance(company, l); }}
+              labels={LANG_LABEL}
+            />
           </div>
           <div className="flex items-center gap-2">
             <SectionLabel>Channel</SectionLabel>
@@ -322,43 +426,7 @@ export default function OutreachPage() {
             <RiskChecklist checklist={draft.risk_checklist} />
           </div>
 
-          {/* 4 + 5. Who to contact + manual search links */}
-          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">Who to contact</h3>
-              <p className="mt-0.5 text-xs text-slate-500">{draft.contact_guidance.note}</p>
-            </div>
-            <ol className="space-y-2">
-              {draft.contact_guidance.recommended_contact_roles
-                .slice()
-                .sort((a, b) => a.priority - b.priority)
-                .map((r) => (
-                  <li key={r.role} className="flex gap-2 text-sm">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                      {r.priority}
-                    </span>
-                    <div>
-                      <span className="font-medium text-slate-800">{r.label}</span>
-                      <span className="text-slate-500"> — {r.why}</span>
-                    </div>
-                  </li>
-                ))}
-            </ol>
-            <div>
-              <SectionLabel>Manual search links (open these yourself)</SectionLabel>
-              <ul className="mt-2 space-y-1">
-                {draft.contact_guidance.manual_search_links.map((l) => (
-                  <li key={l.url}>
-                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                      {l.label} ↗
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* 6. Follow-up timing */}
+          {/* Follow-up timing (who-to-contact is shown up-front, above the draft) */}
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <SectionLabel>Suggested follow-up</SectionLabel>
             <p className="mt-1 text-sm text-amber-900">{draft.suggested_follow_up}</p>

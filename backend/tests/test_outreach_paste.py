@@ -207,9 +207,29 @@ def test_endpoint_uses_saved_profile_skills(client, monkeypatch):
 
 
 def test_no_auto_send_routes(client):
-    # The outreach surface is draft-only — there must be no send endpoint.
-    outreach_paths = [
+    # The outreach surface is draft + read-only contact guidance — never a send.
+    outreach_paths = {
         r.path for r in client.app.routes if getattr(r, "path", "").startswith("/outreach")
-    ]
-    assert outreach_paths == ["/outreach/draft-from-paste"]
+    }
+    assert outreach_paths == {"/outreach/draft-from-paste", "/outreach/contact-guidance"}
     assert not any("send" in p for p in outreach_paths)
+
+
+def test_contact_guidance_endpoint_is_safe_links_only(client):
+    resp = client.get("/outreach/contact-guidance", params={"company": "Trendyol"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["company"] == "Trendyol"
+    # Prioritized roles + manual search links the user opens themselves.
+    assert data["recommended_contact_roles"]
+    assert data["manual_search_links"]
+    # No auto-contact: every link is just a URL string the user opens.
+    assert all(l["url"].startswith("http") for l in data["manual_search_links"])
+
+
+def test_contact_guidance_localizes_to_turkish(client):
+    data = client.get(
+        "/outreach/contact-guidance", params={"company": "Getir", "language": "tr"}
+    ).json()
+    labels = " ".join(r["label"] for r in data["recommended_contact_roles"]).lower()
+    assert "işe alım" in labels or "yetenek" in labels

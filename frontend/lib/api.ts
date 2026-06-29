@@ -906,6 +906,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  // Who to contact at a company + safe search links, BEFORE drafting.
+  getContactGuidance: (company: string, language: "en" | "tr" = "en") =>
+    request<ContactGuidance>(
+      `/outreach/contact-guidance?company=${encodeURIComponent(company)}&language=${language}`,
+    ),
 
   // Curated Turkey + Remote/EU opportunity feed (no scraping; seeded sample +
   // public feeds + manual import). GET never hits the network.
