@@ -220,8 +220,9 @@ it serves **real listings only** — no fake/sample data.
 
 - **Compliant sources, pulled in one click.** "Refresh live sources"
   (`POST /opportunities/refresh-all`) fetches from companies' **official public
-  ATS APIs** (Lever — Dream Games, Codeway, Commencis; plus Greenhouse/Ashby
-  adapters) **and** keyless **public job APIs** (Arbeitnow, Remotive, Jobicy).
+  ATS APIs** (Lever — Dream Games, Codeway, Commencis, Trendyol, Peak Games,
+  Midas, Picus Security; plus Greenhouse/Ashby adapters) **and** keyless
+  **public job APIs** (Arbeitnow, Remotive, Jobicy).
   A manual JSON import endpoint (`POST /opportunities/import`) is also available.
   These are the official embed APIs companies publish — **no scraping** of
   LinkedIn, Kariyer.net, Youthall, Techcareer, Coderspace, or any protected site;

@@ -204,6 +204,25 @@ def test_no_profile_leaves_match_empty(db_session):
     assert all(i["match"]["matched_skills"] == [] for i in items)
 
 
+# ----- Source registry (Phase 2: verified live boards) -----
+
+def test_live_sources_are_the_verified_set():
+    live = {s["id"] for s in opp.list_sources() if s["live"]}
+    assert live == {"dreamgames", "codeway", "commencis",
+                    "trendyol", "peak", "midas", "picus"}
+
+
+def test_every_live_source_has_a_real_provider_and_token():
+    for s in opp.list_sources():
+        if s["live"]:
+            assert s["board_token"], f"{s['id']} live but has no board_token"
+            assert s["ats_provider"] in opp._PROVIDER_MAPPERS
+    # Disabled/manual sources must never carry an invented token.
+    for s in opp.SOURCE_REGISTRY:
+        if not s.get("enabled"):
+            assert s.get("board_token") is None
+
+
 # ----- Public source resilience (no network in normal tests) -----
 
 def test_refresh_public_source_failure_is_graceful(client, monkeypatch):
@@ -394,10 +413,11 @@ def test_sources_registry_endpoint(client):
     # Verified Lever boards are enabled + live.
     assert by_id["dreamgames"]["enabled"] and by_id["dreamgames"]["live"]
     assert by_id["dreamgames"]["source_confidence"] == "official_ats"
+    assert by_id["trendyol"]["enabled"] and by_id["trendyol"]["live"]
     # Companies without a verified token are disabled/manual (no invented token).
-    assert by_id["trendyol"]["enabled"] is False
-    assert by_id["trendyol"]["board_token"] is None
-    assert by_id["trendyol"]["live"] is False
+    assert by_id["getir"]["enabled"] is False
+    assert by_id["getir"]["board_token"] is None
+    assert by_id["getir"]["live"] is False
 
 
 def test_refresh_sources_skips_disabled_and_imports_enabled(client, monkeypatch):
@@ -406,7 +426,7 @@ def test_refresh_sources_skips_disabled_and_imports_enabled(client, monkeypatch)
     body = client.post("/opportunities/refresh-sources").json()
     statuses = {s["id"]: s["status"] for s in body["sources"]}
     assert statuses["dreamgames"] == "success"
-    assert statuses["trendyol"] == "skipped"   # disabled/manual not refreshed
+    assert statuses["getir"] == "skipped"   # disabled/manual not refreshed
     assert body["succeeded"] >= 3 and body["created"] > 0
     # Imported rows carry official_ats confidence + lever provider.
     items = client.get("/opportunities?source=lever").json()["items"]
