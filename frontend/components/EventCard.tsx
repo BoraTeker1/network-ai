@@ -33,7 +33,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 
 const PROVIDER_LABELS: Record<string, string> = {
   confs_tech: "confs.tech",
-  ticketmaster: "Ticketmaster",
+  kommunity: "Kommunity",
   eventbrite: "Eventbrite",
   meetup: "Meetup",
   luma: "Luma",

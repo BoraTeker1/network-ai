@@ -19,15 +19,10 @@ def _now():
     return datetime.now(timezone.utc)
 
 
-def _iso(days_from_now):
-    return (_now() + timedelta(days=days_from_now)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 @pytest.fixture(autouse=True)
 def _hermetic_providers(monkeypatch):
-    """No real network in tests: disable the Ticketmaster key and stub confs.tech.
-    Individual tests opt into provider data by overriding these."""
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "")
+    """No real network in tests: stub confs.tech to return nothing by default.
+    Individual tests opt into provider data by overriding this."""
     monkeypatch.setattr(events, "_fetch_confs_tech_raw", lambda year, topic: [])
 
 
@@ -66,21 +61,6 @@ def _save_profile(client):
     assert r.status_code == 200
 
 
-def _tm_event(name, *, url, start, end=None, city="Atlanta", state="GA",
-              segment="Miscellaneous", venue_name="Tech Hub", online=False):
-    venue = {"name": venue_name, "type": "online" if online else "venue"}
-    if not online:
-        venue["city"] = {"name": city}
-        venue["state"] = {"stateCode": state}
-    return {
-        "name": name,
-        "url": url,
-        "dates": {"start": {"dateTime": start}, **({"end": {"dateTime": end}} if end else {})},
-        "classifications": [{"segment": {"name": segment}}],
-        "_embedded": {"venues": [venue]},
-    }
-
-
 # ----- Search-term construction -----
 
 def test_search_context_built_from_strongest_match(client, seeded_job, db_session):
@@ -110,23 +90,24 @@ def test_role_family_inference():
 def test_manual_links_returned_when_no_providers(client, seeded_job, monkeypatch):
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    # Ensure no Ticketmaster key for this test.
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "")
 
     data = client.get("/events/recommendations").json()
     assert data["recommendations"] == []
     assert "No verified upcoming events" in data["message"]
     links = data["search_links"]
-    assert 5 <= len(links) <= 9
+    assert 5 <= len(links) <= 13
     # Every link is a real, prefilled URL with provider + rationale.
     for link in links:
         assert link["url"].startswith("http")
-        assert link["provider"] in {"google", "eventbrite", "meetup", "luma", "company"}
+        assert link["provider"] in {"google", "kommunity", "eventbrite", "meetup",
+                                    "luma", "company"}
         assert link["why"]
     # Company-specific searches appear because we know the company.
     assert any(link["provider"] == "company" for link in links)
-    providers = {p["provider"]: p for p in data["providers"]}
-    assert providers["ticketmaster"]["configured"] is False
+    # Turkey-localized: Kommunity (the local tech-events platform) is surfaced.
+    assert any(link["provider"] == "kommunity" for link in links)
+    # Ticketmaster is gone; it must not appear as a provider anymore.
+    assert "ticketmaster" not in {p["provider"] for p in data["providers"]}
 
 
 def test_endpoint_stable_shape_with_no_data(client):
@@ -143,116 +124,33 @@ def test_endpoint_stable_shape_with_no_data(client):
     assert expected <= set(data.keys())
 
 
-# ----- Ticketmaster adapter (mocked HTTP) -----
+# ----- Turkey localization of manual links -----
 
-def test_ticketmaster_filters_past_events(client, seeded_job, monkeypatch):
+def test_manual_links_are_turkey_localized(client, seeded_job):
+    """The keyless fallback surfaces Kommunity + Turkish communities, not US-only
+    sources."""
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
 
-    payload = {"_embedded": {"events": [
-        _tm_event("Backend Engineering Conference", url="https://tm/past",
-                  start=_iso(-3), segment="Conferences"),
-        _tm_event("Atlanta Backend Meetup", url="https://tm/future",
-                  start=_iso(5), segment="Miscellaneous"),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    data = client.get("/events/recommendations").json()
-    urls = {r["source_url"] for r in data["recommendations"]}
-    assert "https://tm/future" in urls
-    assert "https://tm/past" not in urls  # past event dropped
+    links = client.get("/events/recommendations").json()["search_links"]
+    km = [l for l in links if l["provider"] == "kommunity"]
+    assert km, "expected at least one Kommunity link"
+    assert all("kommunity.com" in l["url"] for l in km)
+    # A Turkish tech-community search is present.
+    assert any("Türkiye" in l["query"] or "topluluk" in l["query"].lower()
+               for l in links)
 
 
-def test_ticketmaster_filters_out_of_window_events(client, seeded_job, monkeypatch):
+def test_remote_match_nudges_turkish_hub_cities(client, remote_job, monkeypatch):
+    """A remote match (no real city) nudges Turkish hub cities, never US ones."""
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
 
-    payload = {"_embedded": {"events": [
-        _tm_event("Far-off Backend Summit", url="https://tm/far",
-                  start=_iso(120), segment="Conferences"),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    data = client.get("/events/recommendations?days_ahead=30").json()
-    assert data["recommendations"] == []  # 120 days out > 30-day window
-
-
-def test_real_events_have_source_url_and_fetched_at(client, seeded_job, monkeypatch):
-    _save_profile(client)
-    assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    payload = {"_embedded": {"events": [
-        _tm_event("Atlanta Backend Networking Mixer", url="https://tm/e1",
-                  start=_iso(7), segment="Miscellaneous"),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    data = client.get("/events/recommendations").json()
-    assert data["recommendations"], "expected at least one real event"
-    for rec in data["recommendations"]:
-        assert rec["source_url"].startswith("http")
-        assert rec["fetched_at"]
-        assert rec["source_name"] == "ticketmaster"
-        assert rec["freshness_label"] in events.FRESHNESS_LABELS
-        assert rec["confidence"] in events.CONFIDENCE_LEVELS
-        assert rec["event_type"] in events.EVENT_TYPES
-
-
-def test_irrelevant_events_are_not_invented_or_padded(client, seeded_job, monkeypatch):
-    """A pure concert with no matching terms is dropped — we never pad results."""
-    _save_profile(client)
-    assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    payload = {"_embedded": {"events": [
-        _tm_event("Taylor Swift Live", url="https://tm/concert",
-                  start=_iso(10), segment="Music"),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    data = client.get("/events/recommendations").json()
-    assert data["recommendations"] == []
-
-
-def test_ranking_favors_fresh_relevant_events(client, seeded_job, monkeypatch):
-    _save_profile(client)
-    assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    payload = {"_embedded": {"events": [
-        # Further out, generic conference (no matched terms).
-        _tm_event("Generic Tech Conference", url="https://tm/generic",
-                  start=_iso(25), segment="Conferences"),
-        # Soon + mentions the company/role family -> should rank first.
-        _tm_event("Acme Backend Engineering Meetup", url="https://tm/acme",
-                  start=_iso(3), segment="Miscellaneous"),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    recs = client.get("/events/recommendations").json()["recommendations"]
-    assert len(recs) == 2
-    assert recs[0]["source_url"] == "https://tm/acme"
-    assert recs[0]["rank_score"] > recs[1]["rank_score"]
-
-
-def test_provider_failure_degrades_to_manual_links(client, seeded_job, monkeypatch):
-    _save_profile(client)
-    assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    def boom(params):
-        raise RuntimeError("network down")
-
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", boom)
-
-    data = client.get("/events/recommendations").json()
-    assert data["recommendations"] == []
-    assert len(data["search_links"]) >= 5  # fallback still works
-    tm = next(p for p in data["providers"] if p["provider"] == "ticketmaster")
-    assert tm["ok"] is False and "failed" in tm["note"].lower()
+    links = client.get("/events/recommendations").json()["search_links"]
+    hub_labels = " ".join(l["label"] for l in links if "hub city" in l["label"].lower())
+    assert hub_labels, "expected hub-city nudges for a remote match"
+    assert any(city in hub_labels for city in ("İstanbul", "Ankara", "İzmir"))
+    assert "Atlanta" not in hub_labels and "New York" not in hub_labels
 
 
 # ----- Remote / non-city location normalization -----
@@ -304,32 +202,20 @@ def test_normalize_prefers_user_then_goal_then_job():
     assert events.normalize_event_location("Remote", "Anywhere", None) is None
 
 
-def test_remote_job_does_not_send_city_to_ticketmaster(client, remote_job, monkeypatch):
+def test_remote_match_resolves_to_no_city(client, remote_job, monkeypatch):
+    """A remote match never resolves to a geo city; the message says so."""
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    captured = {}
-
-    def capture(params):
-        captured.update(params)
-        return {"_embedded": {"events": []}}
-
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", capture)
 
     data = client.get("/events/recommendations").json()
-    # The whole point: never geo-filter on "Remote".
-    assert "city" not in captured
-    assert captured.get("keyword")  # keyword search still runs
     assert data["search_context"]["is_remote"] is True
     assert data["search_context"]["city"] is None
     assert "remote" in data["message"].lower()
 
 
-def test_remote_job_still_returns_manual_links(client, remote_job, monkeypatch):
+def test_remote_job_still_returns_manual_links(client, remote_job):
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "")
 
     data = client.get("/events/recommendations").json()
     assert len(data["search_links"]) >= 5
@@ -339,18 +225,17 @@ def test_remote_job_still_returns_manual_links(client, remote_job, monkeypatch):
     assert any("near me" in link["query"].lower() for link in data["search_links"])
 
 
-def test_remote_provider_ok_when_api_works_but_empty(client, remote_job, monkeypatch):
+def test_confs_tech_provider_ok_when_api_works_but_empty(client, remote_job, monkeypatch):
+    """confs.tech reachable but with no in-window events still reports ok/empty."""
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw",
-                        lambda params: {"_embedded": {"events": []}})
+    monkeypatch.setattr(events, "_fetch_confs_tech_raw", lambda year, topic: [])
 
     data = client.get("/events/recommendations").json()
-    tm = next(p for p in data["providers"] if p["provider"] == "ticketmaster")
-    assert tm["configured"] is True
-    assert tm["ok"] is True  # call succeeded even though results are empty
-    assert tm["count"] == 0
+    ct = next(p for p in data["providers"] if p["provider"] == "confs_tech")
+    assert ct["configured"] is True
+    assert ct["ok"] is True  # call succeeded even though results are empty
+    assert ct["count"] == 0
     assert data["recommendations"] == []
 
 
@@ -498,18 +383,3 @@ def test_confs_tech_provider_ok_when_all_topics_fail(client, seeded_job, monkeyp
     ct = next(p for p in data["providers"] if p["provider"] == "confs_tech")
     assert ct["ok"] is False
     assert len(data["search_links"]) >= 5  # manual fallback still works
-
-
-def test_include_online_false_drops_online_events(client, seeded_job, monkeypatch):
-    _save_profile(client)
-    assert client.post("/jobs/match-all").status_code == 200
-    monkeypatch.setattr(events.config, "get_ticketmaster_api_key", lambda: "TESTKEY")
-
-    payload = {"_embedded": {"events": [
-        _tm_event("Backend Webinar", url="https://tm/online",
-                  start=_iso(4), segment="Miscellaneous", online=True),
-    ]}}
-    monkeypatch.setattr(events, "_fetch_ticketmaster_raw", lambda params: payload)
-
-    data = client.get("/events/recommendations?include_online=false").json()
-    assert data["recommendations"] == []

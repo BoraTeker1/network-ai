@@ -85,15 +85,6 @@ def get_pdl_api_key() -> str:
 # Leave blank to keep API-backed event discovery OFF. The feature still works
 # with high-quality manual search links. No scraping is ever performed.
 
-def get_ticketmaster_api_key() -> str:
-    return _get("TICKETMASTER_API_KEY")
-
-
-def has_ticketmaster() -> bool:
-    """True only when a Ticketmaster Discovery API key is present."""
-    return bool(get_ticketmaster_api_key())
-
-
 def get_eventbrite_api_token() -> str:
     return _get("EVENTBRITE_API_TOKEN")
 

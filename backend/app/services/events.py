@@ -124,7 +124,7 @@ class EventSearchQuery:
     """A deterministic, prefilled MANUAL search link (the safe fallback)."""
 
     label: str
-    provider: str            # google / eventbrite / meetup / luma / company
+    provider: str            # google / kommunity / eventbrite / meetup / luma / company
     query: str               # human-readable query string
     url: str                 # prefilled search URL the user opens themselves
     why: str                 # why this search is relevant to the strongest match
@@ -143,7 +143,7 @@ class EventRecommendation:
     end_datetime: str | None
     location: str | None
     is_online: bool | None
-    source_name: str         # provider that returned it (e.g. "ticketmaster")
+    source_name: str         # provider that returned it (e.g. "confs_tech")
     source_url: str
     fetched_at: str          # ISO-8601 UTC timestamp of the fetch
     freshness_label: str     # one of FRESHNESS_LABELS
@@ -208,7 +208,7 @@ def _is_remote_pref(location: str | None) -> bool:
 
 
 # Location strings that are NOT a physical city and must never be sent as a
-# geo filter to a provider (Ticketmaster would return 0 results for "Remote").
+# geo filter to a provider or used to phrase a "near {city}" search.
 _NON_CITY_VALUES = {
     "remote", "anywhere", "united states", "usa", "us", "u.s.", "u.s.a.",
     "america", "multiple locations", "various", "various locations",
@@ -419,19 +419,33 @@ def build_search_links(context: dict) -> list[EventSearchQuery]:
     add("Conferences nearby", "google", q3, _google_url(q3),
         f"Larger {family} conferences {loc}.")
 
-    # 4: new-grad career fair.
-    q4 = f"new grad software engineer career fair {loc}".strip()
-    add("New-grad career fairs", "google", q4, _google_url(q4),
-        f"Career fairs aimed at new-grad software engineers {loc}.")
+    # 4: new-grad / student career fair (Turkey-aware phrasing).
+    q4 = f"new grad software engineer kariyer günleri career fair {loc}".strip()
+    add("New-grad / student career fairs", "google", q4, _google_url(q4),
+        f"Career fairs (and üniversite kariyer günleri) for new-grad engineers {loc}.")
 
-    # Remote-only nudge: example cities so the user picks a real place to meet
+    # 5: Kommunity — Turkey's dominant tech-events platform. No open API, so this
+    # is a prefilled search the user opens themselves.
+    km_url = "https://kommunity.com/search?text=" + urllib.parse.quote_plus(primary)
+    add("Kommunity (Turkey tech events)", "kommunity", primary, km_url,
+        f"Kommunity is where Turkish {family} meetups, workshops, and talks are "
+        "organized — search your stack and follow the communities.")
+
+    # 6: Turkish tech communities to follow (GDG, Devnot, JS/Python TR, etc.).
+    qc = f"{primary} topluluk etkinlik (GDG OR Devnot OR Kommunity) Türkiye {month_year}"
+    add("Turkish tech communities", "google", qc, _google_url(qc),
+        f"Active Turkish {family} communities (GDG İstanbul/Ankara, Devnot, "
+        "JSTR, PyData) that run recurring events.")
+
+    # Remote-only nudge: Turkish hub cities so the user picks a real place to meet
     # people, instead of staring at zero local events.
     if not has_city:
-        for example in ("Atlanta", "New York"):
+        for example in ("İstanbul", "Ankara", "İzmir"):
             eq = f"{primary} meetup {example}"
-            add(f"Try a hub city: {example}", "google", eq, _google_url(eq),
-                f"Your match is remote — try {family} meetups in {example} or "
-                "another city you can travel to.")
+            add(f"Try a hub city: {example}", "kommunity",
+                eq, "https://kommunity.com/search?text=" + urllib.parse.quote_plus(eq),
+                f"Your match is remote — find {family} meetups in {example}, "
+                "Turkey's main tech hubs.")
 
     # 5–6: company-specific events (only when we know the company).
     if company:
@@ -464,164 +478,6 @@ def build_search_links(context: dict) -> list[EventSearchQuery]:
         f"Luma-hosted {family} events (via a site-restricted search).")
 
     return links
-
-
-# ----- Provider adapters -----
-
-def _fetch_ticketmaster_raw(params: dict) -> dict:
-    """Thin HTTP boundary for the Ticketmaster Discovery API (mockable in tests)."""
-    resp = requests.get(
-        "https://app.ticketmaster.com/discovery/v2/events.json",
-        params=params,
-        timeout=20,
-        headers={"User-Agent": "network-ai/0.1"},
-    )
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _ticketmaster_provider(
-    context: dict, filters: dict, fetched_at: str
-) -> tuple[EventProviderResult, list[EventRecommendation]]:
-    """Ticketmaster Discovery API adapter. Returns real events only, or empty.
-
-    Ticketmaster skews toward concerts/sports, so we KEEP an event only when it
-    matches a context term or classifies as a tech/career/networking event —
-    keeping results honest and relevant rather than padded.
-    """
-    api_key = config.get_ticketmaster_api_key()
-    if not api_key:
-        return (EventProviderResult("ticketmaster", False, False, 0,
-                                    "Set TICKETMASTER_API_KEY to enable."), [])
-
-    now = _now()
-    params: dict = {
-        "apikey": api_key,
-        "size": 30,
-        "sort": "date,asc",
-        "startDateTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "endDateTime": (now + timedelta(days=filters["days_ahead"])).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        ),
-        "keyword": context["role_family_keywords"][0],
-    }
-    # Only geo-filter on a REAL city. A remote/unknown match leaves the city out
-    # so Ticketmaster falls back to a keyword (+ online) search instead of
-    # matching the non-city "Remote" and returning nothing.
-    if filters.get("city"):
-        params["city"] = filters["city"]
-        params["radius"] = filters.get("radius_miles") or 50
-        params["unit"] = "miles"
-
-    try:
-        data = _fetch_ticketmaster_raw(params)
-    except Exception as exc:  # never crash the endpoint on a provider failure
-        return (EventProviderResult("ticketmaster", True, False, 0,
-                                    f"Request failed: {type(exc).__name__}"), [])
-
-    events = (data.get("_embedded") or {}).get("events") or []
-    recs: list[EventRecommendation] = []
-    for ev in events:
-        rec = _ticketmaster_to_rec(ev, context, filters, fetched_at, now)
-        if rec is not None:
-            recs.append(rec)
-
-    note = "OK" if recs else "No matching tech/networking events in range."
-    return (EventProviderResult("ticketmaster", True, True, len(recs), note), recs)
-
-
-def _ticketmaster_to_rec(
-    ev: dict, context: dict, filters: dict, fetched_at: str, now: datetime
-) -> EventRecommendation | None:
-    """Map one Ticketmaster event dict -> EventRecommendation, or None to drop."""
-    title = (ev.get("name") or "").strip()
-    source_url = ev.get("url")
-    if not title or not source_url:
-        return None  # never surface an event we can't link to
-
-    dates = ev.get("dates") or {}
-    start_raw = (dates.get("start") or {}).get("dateTime") or (
-        dates.get("start") or {}
-    ).get("localDate")
-    end_raw = (dates.get("end") or {}).get("dateTime")
-    start_dt = _parse_dt(start_raw)
-    end_dt = _parse_dt(end_raw)
-
-    # Filter out past events; respect the days_ahead window.
-    if start_dt is not None:
-        if start_dt < now:
-            return None
-        if start_dt > now + timedelta(days=filters["days_ahead"]):
-            return None
-
-    venues = (ev.get("_embedded") or {}).get("venues") or []
-    venue = venues[0] if venues else {}
-    is_online = bool(
-        (venue.get("type") == "online")
-        or "virtual" in title.lower()
-        or "online" in title.lower()
-    )
-    if is_online and not filters.get("include_online", True):
-        return None
-
-    location = None
-    if venue:
-        city = ((venue.get("city") or {}).get("name") or "").strip()
-        state = ((venue.get("state") or {}).get("stateCode") or "").strip()
-        name = (venue.get("name") or "").strip()
-        location = ", ".join(p for p in [name, city, state] if p) or None
-    if is_online and not location:
-        location = "Online"
-
-    classifications = ev.get("classifications") or []
-    class_text = " ".join(
-        str(((classifications[0] if classifications else {}).get(k) or {}).get("name", ""))
-        for k in ("segment", "genre", "subGenre")
-    )
-    full_text = f"{title} {class_text}"
-    event_type = _classify_event_type(full_text, is_online)
-    matched = _matched_terms(full_text, context)
-
-    # Honesty/relevance gate: keep only events that match a term or are a
-    # genuine tech/career/networking type. Drop generic concerts/sports.
-    relevant_types = {"conference", "meetup", "career_fair", "hackathon",
-                      "tech_talk", "webinar"}
-    if not matched and event_type not in relevant_types:
-        return None
-
-    if matched:
-        reason = (
-            f"Mentions {', '.join(matched[:3])} — relevant to your "
-            f"{context['role_family']} target."
-        )
-    else:
-        reason = (
-            f"A {event_type.replace('_', ' ')} that fits your "
-            f"{context['role_family']} networking goal."
-        )
-
-    start_iso = start_dt.isoformat() if start_dt else None
-    rec = EventRecommendation(
-        title=title,
-        organizer=(venue.get("name") if venue else None),
-        event_type=event_type,
-        relevance_reason=reason,
-        matched_terms=matched,
-        start_datetime=start_iso,
-        end_datetime=end_dt.isoformat() if end_dt else None,
-        location=location,
-        is_online=is_online,
-        source_name="ticketmaster",
-        source_url=source_url,
-        fetched_at=fetched_at,
-        freshness_label=_freshness(start_dt, now),
-        confidence=_confidence(
-            has_date=start_dt is not None,
-            has_location=bool(location),
-            matched=len(matched),
-        ),
-    )
-    return rec
 
 
 # ----- confs.tech provider (open tech-conference dataset, no key) -----
@@ -670,7 +526,7 @@ def _confs_tech_to_rec(
     """Map one confs.tech record -> EventRecommendation, or None to drop.
 
     These are real, dated tech conferences; the topic file already establishes
-    role relevance, so we don't apply the Ticketmaster firehose gate here.
+    role relevance, so we don't apply an extra relevance gate here.
     """
     title = (ev.get("name") or "").strip()
     url = (ev.get("url") or "").strip()
@@ -846,23 +702,24 @@ def recommend_events(
     }
     fetched_at = _now().isoformat()
 
-    # Run configured providers. Today: Ticketmaster (real) + manual fallbacks.
+    # Run providers. confs.tech (real, key-less open dataset of dated tech
+    # conferences) is the single live recommendation source; everything else is
+    # surfaced as honest manual search links rather than faked results.
     providers: list[EventProviderResult] = []
     recommendations: list[EventRecommendation] = []
 
-    tm_result, tm_recs = _ticketmaster_provider(context, filters, fetched_at)
-    providers.append(tm_result)
-    recommendations.extend(tm_recs)
-
-    # confs.tech — real, key-less open dataset of tech conferences. This is the
-    # main source of actual tech events (Ticketmaster carries almost none).
     ct_result, ct_recs = _confs_tech_provider(context, filters, fetched_at)
     providers.append(ct_result)
     recommendations.extend(ct_recs)
 
-    # Eventbrite / Meetup / Luma have no compliant public event-DISCOVERY API
-    # (Eventbrite's was retired; Meetup needs paid OAuth; Luma has none), so we
-    # surface them as prefilled manual search links instead of faking results.
+    # Kommunity / Eventbrite / Meetup / Luma have no compliant public event-
+    # DISCOVERY API (Kommunity has none; Eventbrite's was retired; Meetup needs
+    # paid OAuth; Luma has none), so we surface them as prefilled manual search
+    # links instead of faking results.
+    providers.append(EventProviderResult(
+        "kommunity", False, False, 0,
+        "Turkey's tech-events platform has no open API; using manual search links.",
+    ))
     providers.append(EventProviderResult(
         "eventbrite", config.get_eventbrite_api_token() != "", False, 0,
         "Public event-discovery API was retired; using manual search links.",
