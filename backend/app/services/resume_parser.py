@@ -5,6 +5,7 @@ No LLM calls yet — deterministic and offline.
 """
 
 import re
+from functools import lru_cache
 
 # Canonical skill names we look for. Matching is case-insensitive and
 # token-aware (so "Java" does not match inside "JavaScript").
@@ -44,6 +45,28 @@ def _skill_pattern(skill: str) -> re.Pattern:
 
 
 _SKILL_PATTERNS = [(skill, _skill_pattern(skill)) for skill in KNOWN_SKILLS]
+
+
+@lru_cache(maxsize=512)
+def _cached_pattern(skill: str) -> re.Pattern:
+    """Compile (and cache) a token-aware pattern for an arbitrary skill string.
+
+    Lets callers match user skills against any text (e.g. a job description)
+    without recompiling the same regex on every row. Cached because the same
+    handful of skills is matched across hundreds of opportunities.
+    """
+    return _skill_pattern(skill)
+
+
+def skill_in_text(skill: str, text: str) -> bool:
+    """True if `skill` appears as a whole, case-insensitive token in `text`.
+
+    Token-aware (so "Java" never matches inside "JavaScript", "AWS" never
+    inside "flaws"). Safe on empty/None inputs.
+    """
+    if not skill or not text:
+        return False
+    return bool(_cached_pattern(skill.lower()).search(text))
 
 
 def extract_skills(resume_text: str) -> list[str]:

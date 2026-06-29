@@ -395,6 +395,7 @@ class Opportunity(Base):
 
     target_region = Column(String, index=True, default="unknown")   # OPP_TARGET_REGIONS
     seniority_level = Column(String, index=True, default="unknown")  # OPP_SENIORITY_LEVELS
+    job_function = Column(String, index=True, nullable=True)         # software_engineering/other
     remote_policy = Column(String, default="unknown")               # OPP_REMOTE_POLICIES
     country_scope = Column(String, nullable=True)    # e.g. "EMEA", "Worldwide", "US only"
     accepts_turkey_based = Column(Boolean, nullable=True)  # explicit override if known

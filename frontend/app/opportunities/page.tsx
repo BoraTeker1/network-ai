@@ -14,9 +14,15 @@ const REGIONS = ["", "turkey", "remote", "europe", "global"];
 const REGION_LABEL: Record<string, string> = {
   "": "All regions", turkey: "Turkey", remote: "Remote", europe: "Europe", global: "Global",
 };
-const SENIORITY = ["", "internship", "new_grad", "junior"];
-const SENIORITY_LABEL: Record<string, string> = {
-  "": "All levels", internship: "Internship", new_grad: "New grad", junior: "Junior",
+// Level tabs keep new-grad and internship seekers in separate lanes.
+const LEVELS = ["", "new_grad", "internship", "junior"];
+const LEVEL_LABEL: Record<string, string> = {
+  "": "All levels", new_grad: "New grad", internship: "Internships", junior: "Junior",
+};
+// Field tabs serve tech and business students separately (creative/admin hidden).
+const FIELDS = ["all", "software_engineering", "business"];
+const FIELD_LABEL: Record<string, string> = {
+  all: "All fields", software_engineering: "Engineering", business: "Business",
 };
 const APPLICABILITY = ["", "strong", "possible", "unclear", "no"];
 const APPLICABILITY_LABEL: Record<string, string> = {
@@ -45,13 +51,17 @@ function confidenceStyle(c: string | null): string {
 const chip = "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
 const select =
   "rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none";
+const tab = (active: boolean) =>
+  `rounded-full px-3 py-1 text-sm font-medium ${
+    active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+  }`;
 
 export default function OpportunitiesPage() {
   const router = useRouter();
   const [items, setItems] = useState<Opportunity[]>([]);
   const [sources, setSources] = useState<OpportunitySource[]>([]);
   const [showSources, setShowSources] = useState(false);
-  const [filters, setFilters] = useState<OpportunityFilters>({});
+  const [filters, setFilters] = useState<OpportunityFilters>({ function: "all" });
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,9 +91,11 @@ export default function OpportunitiesPage() {
     setRefreshing(true);
     setNotice(null);
     try {
-      const r = await api.refreshOpportunitySources();
+      // One click pulls everything: official ATS boards + public job APIs
+      // (Arbeitnow / Remotive / Jobicy).
+      const r = await api.refreshAllSources();
       setNotice(
-        `Imported ${r.created} new listings · ${r.succeeded} sources live, ` +
+        `Imported ${r.created} new listings · ${r.succeeded} ATS boards live, ` +
           `${r.failed} failed, ${r.skipped} skipped (manual/disabled).`
       );
       await load();
@@ -157,13 +169,38 @@ export default function OpportunitiesPage() {
         )}
       </div>
 
+      {/* Level + Field lanes: new-grad vs internship, and engineering vs business */}
+      <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-12 text-xs font-medium uppercase tracking-wide text-slate-400">Level</span>
+          {LEVELS.map((lv) => (
+            <button
+              key={lv || "all"}
+              onClick={() => setFilters((f) => ({ ...f, seniority: lv || undefined }))}
+              className={tab((filters.seniority ?? "") === lv)}
+            >
+              {LEVEL_LABEL[lv]}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-12 text-xs font-medium uppercase tracking-wide text-slate-400">Field</span>
+          {FIELDS.map((fl) => (
+            <button
+              key={fl}
+              onClick={() => setFilters((f) => ({ ...f, function: fl }))}
+              className={tab((filters.function ?? "all") === fl)}
+            >
+              {FIELD_LABEL[fl]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <select className={select} value={filters.region ?? ""} onChange={(e) => setFilters((f) => ({ ...f, region: e.target.value || undefined }))}>
           {REGIONS.map((r) => <option key={r} value={r}>{REGION_LABEL[r]}</option>)}
-        </select>
-        <select className={select} value={filters.seniority ?? ""} onChange={(e) => setFilters((f) => ({ ...f, seniority: e.target.value || undefined }))}>
-          {SENIORITY.map((s) => <option key={s} value={s}>{SENIORITY_LABEL[s]}</option>)}
         </select>
         <select className={select} value={filters.applicability ?? ""} onChange={(e) => setFilters((f) => ({ ...f, applicability: e.target.value || undefined }))}>
           {APPLICABILITY.map((a) => <option key={a} value={a}>{APPLICABILITY_LABEL[a]}</option>)}
@@ -203,6 +240,21 @@ export default function OpportunitiesPage() {
 
               <p className="mt-1 text-xs text-slate-500">{opp.turkey_applicability_reason}</p>
 
+              {opp.match.reason && (
+                <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-1.5">
+                  <p className="text-xs font-medium text-slate-700">{opp.match.reason}</p>
+                  {opp.match.matched_skills.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {opp.match.matched_skills.map((s) => (
+                        <span key={s} className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <span className={chip}>{REGION_LABEL[opp.target_region] ?? opp.target_region}</span>
                 <span className={chip}>{opp.seniority_level.replace("_", " ")}</span>
@@ -229,10 +281,16 @@ export default function OpportunitiesPage() {
                 <button onClick={() => draftOutreach(opp)} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
                   Draft outreach
                 </button>
-                {opp.url && (
-                  <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                    Open application ↗
-                  </a>
+                {opp.is_sample ? (
+                  <span className="text-sm text-slate-400">
+                    Sample listing — refresh live sources for real links
+                  </span>
+                ) : (
+                  opp.url && (
+                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                      Open application ↗
+                    </a>
+                  )
                 )}
               </div>
             </div>

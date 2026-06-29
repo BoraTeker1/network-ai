@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
+from app.services import opportunities
 
 
 @pytest.fixture
@@ -34,6 +35,10 @@ def db_session():
 
 @pytest.fixture
 def client(db_session):
+    # The app no longer auto-seeds the demo feed (real listings only). Tests that
+    # exercise the opportunity feed still need rows, so seed the sample data here.
+    opportunities.ensure_seeded(db_session)
+
     def _override():
         yield db_session
 

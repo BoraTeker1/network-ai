@@ -39,21 +39,25 @@ def list_opportunities(
     tag: str | None = Query(None),
     source: str | None = Query(None),          # filters by source provider
     confidence: str | None = Query(None),
+    function: str = Query("all"),  # all|software_engineering|business|other|any
     include_ineligible: bool = Query(False),
     limit: int = Query(100, ge=1, le=300),
 ):
     """Ranked Turkey-relevant opportunities. Seeds the sample feed on first use;
     no network call happens here. "Probably not eligible" roles (e.g. US-only)
-    are hidden by default — pass include_ineligible=true or applicability=no."""
-    opportunities.ensure_seeded(db)
+    are hidden by default — pass include_ineligible=true or applicability=no.
+    Engineering + business roles by default (creative/admin "other" hidden) — pass
+    function=software_engineering, function=business, function=other, or function=any.
+    The feed serves real listings only; pull them with POST /opportunities/refresh-all."""
     items = opportunities.list_opportunities(
         db, region=region, seniority=seniority, remote_only=remote,
         applicability=applicability, tag=tag, source=source, confidence=confidence,
-        include_ineligible=include_ineligible, profile_skills=_profile_skills(db),
-        limit=limit,
+        function=function, include_ineligible=include_ineligible,
+        profile_skills=_profile_skills(db), limit=limit,
     )
     return {
         "count": len(items),
+        "function": function,
         "applicability_labels": opportunities.APPLICABILITY_KEYS,
         "items": items,
     }
@@ -99,6 +103,13 @@ def refresh_source(source_id: str, db: Session = Depends(get_db)):
     if result is None:
         raise HTTPException(status_code=404, detail=f"Unknown source '{source_id}'")
     return result
+
+
+@router.post("/refresh-all")
+def refresh_all(db: Session = Depends(get_db)):
+    """Refresh everything: official ATS sources + public job APIs (Arbeitnow/
+    Remotive/Jobicy) in one action. Resilient per source."""
+    return opportunities.refresh_all(db)
 
 
 @router.post("/refresh-turkish-sources")

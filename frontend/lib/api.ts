@@ -249,6 +249,14 @@ export type OutreachPrefill = {
   include_location_line: boolean;
 };
 
+export type OpportunityMatch = {
+  matched_skills: string[];
+  missing_skills: string[];
+  matched_count: number;
+  total_skills: number;
+  reason: string | null;
+};
+
 export type Opportunity = {
   id: number;
   source: string;
@@ -259,6 +267,7 @@ export type Opportunity = {
   source_url: string | null;
   target_region: string;
   seniority_level: string;
+  job_function: string;
   remote_policy: string;
   country_scope: string | null;
   turkey_applicability_label: string | null;
@@ -271,10 +280,12 @@ export type Opportunity = {
   source_provider: string | null;
   source_confidence: string | null;
   outreach_prefill: OutreachPrefill;
+  match: OpportunityMatch;
 };
 
 export type OpportunitiesResponse = {
   count: number;
+  function: string;
   applicability_labels: Record<string, string>;
   items: Opportunity[];
 };
@@ -287,6 +298,7 @@ export type OpportunityFilters = {
   tag?: string;
   source?: string;
   confidence?: string;
+  function?: string; // all|software_engineering|business|other|any
   include_ineligible?: boolean;
 };
 
@@ -320,6 +332,17 @@ export type RefreshSourcesResult = {
   succeeded: number;
   failed: number;
   skipped: number;
+  total: number;
+};
+
+export type RefreshAllResult = {
+  created: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  errors: string[];
+  ats: RefreshSourcesResult;
+  public: { created: number; updated: number; errors: string[]; total: number };
   total: number;
 };
 
@@ -895,6 +918,7 @@ export const api = {
     if (filters.tag) params.set("tag", filters.tag);
     if (filters.source) params.set("source", filters.source);
     if (filters.confidence) params.set("confidence", filters.confidence);
+    if (filters.function) params.set("function", filters.function);
     if (filters.include_ineligible) params.set("include_ineligible", "true");
     const qs = params.toString();
     return request<OpportunitiesResponse>(`/opportunities${qs ? `?${qs}` : ""}`);
@@ -903,6 +927,9 @@ export const api = {
     request<{ sources: OpportunitySource[] }>("/opportunities/sources"),
   refreshOpportunitySources: () =>
     request<RefreshSourcesResult>("/opportunities/refresh-sources", { method: "POST" }),
+  // Pull everything in one click: official ATS boards + public job APIs.
+  refreshAllSources: () =>
+    request<RefreshAllResult>("/opportunities/refresh-all", { method: "POST" }),
 
   // Goals
   getGoals: () => request<Goal[]>("/goals"),

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from . import resume_parser
 from ..models import Opportunity
 
 # ----- Controlled vocab + labels -----
@@ -41,6 +42,71 @@ _LABEL_TO_KEY = {v: k for k, v in APPLICABILITY_KEYS.items()}
 _SENIOR_LEVELS = {"senior", "lead", "staff", "principal"}
 _JUNIOR_LEVELS = {"internship", "new_grad", "junior"}
 
+# Job-function classification, so tech students and business students each see
+# only what's relevant. Three buckets: software engineering, business (consulting/
+# finance/marketing/PM/ops/HR…), and other (creative/admin/non-software-eng). The
+# feed shows engineering + business by default and hides "other" noise.
+FUNCTION_SWE = "software_engineering"
+FUNCTION_BUSINESS = "business"
+FUNCTION_OTHER = "other"
+FUNCTION_KEYS = (FUNCTION_SWE, FUNCTION_BUSINESS, FUNCTION_OTHER)
+
+# Strong, unambiguous engineering signals — these win even when another word is
+# also present (e.g. "Software Engineer, Performance Marketing" is still SWE).
+_SWE_STRONG_TERMS = (
+    "software engineer", "software developer", "backend engineer", "back-end engineer",
+    "backend developer", "frontend engineer", "front-end engineer", "frontend developer",
+    "full stack", "full-stack", "fullstack", "web developer", "web engineer",
+    "mobile developer", "mobile engineer", "ios developer", "ios engineer",
+    "android developer", "android engineer", "devops", "site reliability", "sre",
+    "platform engineer", "data engineer", "machine learning engineer", "ml engineer",
+    "qa engineer", "test automation", "automation engineer", "security engineer",
+    "backend", "frontend", "back-end", "front-end", "game developer", "game engineer",
+    "programmer", "embedded software", "firmware", "swe", "sde",
+)
+# Creative / admin / non-software-engineering roles. Checked before business so a
+# "Marketing Artist" reads as creative, not business.
+_OTHER_TERMS = (
+    "artist", "designer", "sound", "copywriter", "content", "community", "writer",
+    "illustrator", "animator", "photographer", "video", "motion", "assistant",
+    "receptionist", "office manager", "facilities", "concept", "mechanical",
+    "civil", "chemical", "electrical", "industrial", "biomedical", "hardware",
+    "scientist", "research",
+)
+# Business / commercial / corporate-function roles (what business students want).
+_BUSINESS_TERMS = (
+    "consult", "business analyst", "data analyst", "analyst", "business",
+    "finance", "financial", "fp&a", "accountant", "accounting", "audit", "tax",
+    "marketing", "sales", "solutions engineer", "solution engineer", "sales engineer",
+    "support engineer", "customer engineer", "pre-sales", "presales",
+    "account manager", "account executive", "business development", "strategy",
+    "strategic", "operations", "product manager", "project manager", "program manager",
+    "procurement", "supply chain", "commercial", "economist", "management trainee",
+    "graduate program", "human resources", "recruit", "talent", "people partner",
+    "hrbp", "legal", "counsel", "growth", "category manager", "customer success",
+    "partnership", "investment", "banking", "associate consultant",
+)
+# Weak engineering signals — used only if nothing above matched.
+_SWE_WEAK_TERMS = ("engineer", "developer", "engineering")
+
+
+def classify_job_function(title: str = "", tags=None) -> str:
+    """Return FUNCTION_SWE / FUNCTION_BUSINESS / FUNCTION_OTHER from title + tags.
+
+    Deliberately ignores the JD body (prose causes false positives). Order is
+    chosen so strong engineering wins first, then creative/admin, then business,
+    then a weak engineering fallback; anything unmatched is "other"."""
+    blob = " ".join([title or "", " ".join(str(t) for t in (tags or []))]).lower()
+    if any(t in blob for t in _SWE_STRONG_TERMS):
+        return FUNCTION_SWE
+    if any(t in blob for t in _OTHER_TERMS):
+        return FUNCTION_OTHER
+    if any(t in blob for t in _BUSINESS_TERMS):
+        return FUNCTION_BUSINESS
+    if any(t in blob for t in _SWE_WEAK_TERMS):
+        return FUNCTION_SWE
+    return FUNCTION_OTHER
+
 SEED_SOURCE = "curated-sample"
 _SEED_PATH = Path(__file__).resolve().parent.parent / "data" / "turkey_eu_jobs_seed.json"
 
@@ -54,6 +120,15 @@ _US_AUTH_TERMS = (
 _EU_CITIZEN_TERMS = (
     "eu citizen", "eu citizenship", "must be an eu citizen",
     "right to work in the eu", "eu work permit required", "eea citizen",
+)
+# US/North-America-scoped LOCATIONS (not work-auth phrasing). Matched only against
+# the location + country_scope fields (never the description) to avoid false hits
+# from words like "usability". A Turkey-based junior can't take these unless the
+# role is also worldwide/EMEA/Europe/Turkey-open.
+_US_LOCATION_TERMS = (
+    "united states", "usa", "u.s.a", "u.s.", "us-based", "u.s based",
+    "north america", "americas only", "us remote", "remote us", "remote - us",
+    "remote, us", "remote (us", "us only", "u.s. only",
 )
 _WORLDWIDE_TERMS = ("worldwide", "anywhere", "global remote", "remote, global",
                     "remote — anywhere", "from anywhere", "any country")
@@ -141,6 +216,16 @@ def classify_turkey_applicability(
         return LABEL_NO, "Requires US work authorization / US-only — not workable from Turkey."
     if any(t in blob for t in _EU_CITIZEN_TERMS):
         return LABEL_NO, "Requires EU citizenship / EU right-to-work — Turkey isn't in the EU."
+    # US/North-America-located roles are hidden by default (this feed is Turkey →
+    # remote/EU). Checked on location + scope only, and skipped when the role is
+    # also open worldwide/EMEA/Europe/Turkey (e.g. a US company hiring "Worldwide").
+    loc_blob = " ".join(str(x) for x in (location, country_scope)).lower()
+    broadly_open = any(
+        t in loc_blob
+        for t in (_WORLDWIDE_TERMS + _EMEA_TERMS + _EUROPE_TERMS + _TURKEY_TERMS)
+    )
+    if any(t in loc_blob for t in _US_LOCATION_TERMS) and not broadly_open:
+        return LABEL_NO, "US/North-America-based location — not workable from Turkey."
     onsite = remote_policy == "onsite"
     has_relocation = any(t in blob for t in _RELOCATION_TERMS)
     if onsite and not any(t in blob for t in _TURKEY_TERMS) and not has_relocation:
@@ -212,6 +297,7 @@ def normalize_record(raw: dict, *, source: str, is_sample: bool) -> dict:
         "source_url": raw.get("source_url") or None,
         "target_region": region,
         "seniority_level": seniority,
+        "job_function": classify_job_function(title=title, tags=tags),
         "remote_policy": remote_policy,
         "country_scope": country_scope,
         "accepts_turkey_based": accepts,
@@ -320,17 +406,121 @@ def fetch_arbeitnow(limit: int = 50) -> list[dict]:
 
 
 def refresh_public_sources(db: Session, limit: int = 50) -> dict:
-    """Fetch + store public listings. Resilient: errors are reported, not raised,
-    so the seeded feed keeps working."""
+    """Fetch + store public remote/EU listings (Arbeitnow + Remotive + Jobicy —
+    all keyless public APIs, no scraping). Resilient: each feed is independent, so
+    one failing reports an error and the others (and the seeded feed) keep working.
+
+    Per each provider's public-API terms, listings are attributed to the source
+    (source_provider) and link back to the original posting (url/source_url)."""
     errors: list[str] = []
-    result = {"created": 0, "updated": 0}
+    created = updated = 0
+
+    def _store(name: str, records: list[dict]) -> None:
+        nonlocal created, updated
+        r = import_records(db, records, source=name, is_sample=False,
+                           source_provider=name, source_confidence="public_api")
+        created += r["created"]
+        updated += r["updated"]
+
     try:
-        records = fetch_arbeitnow(limit=limit)
-        result = import_records(db, records, source="arbeitnow", is_sample=False,
-                                source_provider="arbeitnow", source_confidence="public_api")
+        _store("arbeitnow", fetch_arbeitnow(limit=limit))
     except Exception as exc:  # network/parse failure — degrade gracefully
         errors.append(f"arbeitnow: {type(exc).__name__}")
-    return {**result, "errors": errors, "total": db.query(Opportunity).count()}
+    try:
+        _store("remotive", [_remotive_to_record(j) for j in fetch_remotive(limit=limit)])
+    except Exception as exc:
+        errors.append(f"remotive: {type(exc).__name__}")
+    try:
+        _store("jobicy", [_jobicy_to_record(j) for j in fetch_jobicy(count=limit)])
+    except Exception as exc:
+        errors.append(f"jobicy: {type(exc).__name__}")
+
+    return {"created": created, "updated": updated, "errors": errors,
+            "total": db.query(Opportunity).count()}
+
+
+# --- Remotive (public remote-job API, no key; remote-only listings) ---
+
+REMOTIVE_URL = "https://remotive.com/api/remote-jobs"
+
+
+def fetch_remotive(limit: int = 50, category: str = "software-dev") -> list[dict]:
+    """Fetch a page of Remotive's public remote jobs (defaults to the software
+    category). Network call lives ONLY here so callers can degrade gracefully."""
+    import requests
+
+    params: dict = {"limit": limit}
+    if category:
+        params["category"] = category
+    resp = requests.get(REMOTIVE_URL, params=params, timeout=15, headers=_UA)
+    resp.raise_for_status()
+    return resp.json().get("jobs", [])[:limit]
+
+
+def _remotive_to_record(j: dict) -> dict:
+    loc = (j.get("candidate_required_location") or "").strip()
+    tags = list(j.get("tags") or [])
+    if j.get("category"):
+        tags.append(j["category"])
+    return {
+        "external_id": str(j.get("id")) if j.get("id") is not None else j.get("url"),
+        "company": j.get("company_name"),
+        "title": j.get("title"),
+        "location": loc,
+        "country_scope": loc or None,          # "Worldwide"/"EMEA"/… → classifier
+        "remote_policy": "remote",             # Remotive is remote-only
+        "description": _strip_html(j.get("description"))[:4000],
+        "tags": tags,
+        "url": j.get("url"),
+        "source_url": j.get("url"),
+        "date_posted": j.get("publication_date") or j.get("created_at"),
+    }
+
+
+# --- Jobicy (public remote-job API, no key; remote-only listings) ---
+
+JOBICY_URL = "https://jobicy.com/api/v2/remote-jobs"
+
+
+def fetch_jobicy(count: int = 50, geo: str | None = None,
+                 industry: str = "dev") -> list[dict]:
+    """Fetch a page of Jobicy's public remote jobs (defaults to the dev industry).
+    Network call lives ONLY here so callers can degrade gracefully."""
+    import requests
+
+    params: dict = {"count": count}
+    if geo:
+        params["geo"] = geo
+    if industry:
+        params["industry"] = industry
+    resp = requests.get(JOBICY_URL, params=params, timeout=15, headers=_UA)
+    resp.raise_for_status()
+    return resp.json().get("jobs", [])[:count]
+
+
+def _jobicy_to_record(j: dict) -> dict:
+    geo = (j.get("jobGeo") or "").strip()
+    industry = j.get("jobIndustry") or []
+    jtype = j.get("jobType") or []
+    if isinstance(industry, str):
+        industry = [industry]
+    if isinstance(jtype, str):
+        jtype = [jtype]
+    desc = j.get("jobDescription") or j.get("jobExcerpt") or ""
+    return {
+        "external_id": str(j.get("id")) if j.get("id") is not None else j.get("url"),
+        "company": j.get("companyName"),
+        "title": j.get("jobTitle"),
+        "location": geo,
+        "country_scope": geo or None,          # "Worldwide"/"Europe"/… → classifier
+        "remote_policy": "remote",             # Jobicy is remote-only
+        "seniority_level": (j.get("jobLevel") or "").lower() or None,
+        "description": _strip_html(desc)[:4000],
+        "tags": [str(x) for x in (industry + jtype)],
+        "url": j.get("url"),
+        "source_url": j.get("url"),
+        "date_posted": j.get("pubDate"),
+    }
 
 
 # ----- Official ATS adapters (public job-board APIs, no key, no scraping) -----
@@ -533,6 +723,46 @@ SOURCE_REGISTRY: list[dict] = [
      "careers_url": "https://www.mobileaction.co/careers", "country_scope": "Global",
      "company_category": "App analytics", "priority": 3, "enabled": False,
      "source_confidence": "manual_curated", "notes": "No public ATS token found."},
+    # --- Most-desired employers (directory only). These use custom career sites
+    # with NO public ATS API and scraping is prohibited, so they are listed as
+    # curated careers links — no jobs are fetched. Enable one only if a verified
+    # public ATS board (Lever/Greenhouse/Ashby/Workable) is confirmed. ---
+    {"id": "mckinsey", "company_name": "McKinsey & Company", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.mckinsey.com/careers/search-jobs", "country_scope": "Turkey",
+     "company_category": "Consulting (MBB)", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; no public ATS API — directory link only."},
+    {"id": "bcg", "company_name": "Boston Consulting Group", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://careers.bcg.com", "country_scope": "Turkey",
+     "company_category": "Consulting (MBB)", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; no public ATS API — directory link only."},
+    {"id": "bain", "company_name": "Bain & Company", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.bain.com/careers/find-a-role/", "country_scope": "Turkey",
+     "company_category": "Consulting (MBB)", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; no public ATS API — directory link only."},
+    {"id": "google", "company_name": "Google (Turkey)", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.google.com/about/careers/applications/jobs/results/?location=Turkey",
+     "country_scope": "Turkey", "company_category": "Big Tech", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; scraping prohibited — directory link only."},
+    {"id": "amazon", "company_name": "Amazon (Turkey)", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.amazon.jobs/en/locations/turkey", "country_scope": "Turkey",
+     "company_category": "Big Tech", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; scraping prohibited — directory link only."},
+    {"id": "microsoft", "company_name": "Microsoft (Turkey)", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://jobs.careers.microsoft.com/global/en/search?lc=Turkey", "country_scope": "Turkey",
+     "company_category": "Big Tech", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Custom careers site; no public ATS API — directory link only."},
+    {"id": "isbank", "company_name": "Türkiye İş Bankası", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.isbank.com.tr/en/about-isbank/career", "country_scope": "Turkey",
+     "company_category": "Banking", "priority": 1, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Own careers portal; no public ATS API — directory link only."},
+    {"id": "garantibbva", "company_name": "Garanti BBVA", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.garantibbvakariyer.com", "country_scope": "Turkey",
+     "company_category": "Banking", "priority": 2, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Own careers portal; no public ATS API — directory link only."},
+    {"id": "akbank", "company_name": "Akbank", "ats_provider": "manual", "board_token": None,
+     "careers_url": "https://www.akbank.com/tr-tr/kariyer", "country_scope": "Turkey",
+     "company_category": "Banking", "priority": 2, "enabled": False,
+     "source_confidence": "manual_curated", "notes": "Own careers portal; no public ATS API — directory link only."},
 ]
 
 
@@ -585,6 +815,25 @@ def refresh_source(db: Session, source_id: str) -> dict | None:
     return _refresh_one(db, src)
 
 
+def refresh_all(db: Session) -> dict:
+    """Refresh everything in one action: official ATS sources (Lever/Greenhouse/
+    Ashby) AND public job APIs (Arbeitnow/Remotive/Jobicy). Each part is
+    independently resilient, so one failing source never breaks the others."""
+    ats = refresh_sources(db)
+    public = refresh_public_sources(db)
+    public_errors = public.get("errors", [])
+    return {
+        "created": ats["created"] + public["created"],
+        "succeeded": ats["succeeded"],
+        "failed": ats["failed"] + len(public_errors),
+        "skipped": ats["skipped"],
+        "errors": public_errors,
+        "ats": ats,
+        "public": public,
+        "total": db.query(Opportunity).count(),
+    }
+
+
 # Back-compat alias (older endpoint/tests) — now refreshes the full registry.
 def refresh_turkish_sources(db: Session) -> dict:
     result = refresh_sources(db)
@@ -602,11 +851,59 @@ def _tags(row: Opportunity) -> list[str]:
         return []
 
 
+def _function(row: Opportunity) -> str:
+    """Stored job_function, computed on the fly for legacy rows (pre-migration)."""
+    return getattr(row, "job_function", None) or classify_job_function(
+        title=row.title or "", tags=_tags(row)
+    )
+
+
 _CONFIDENCE_BONUS = {"official_ats": 12, "public_api": 6, "manual_curated": 3,
                      "sample_demo": 0, "unknown": 0}
 
 
-def _score(row: Opportunity, profile_skills: set[str]) -> float:
+def _searchable_text(row: Opportunity) -> str:
+    """Title + description + tags, lowercased — the haystack for skill matching.
+
+    Scans the JD body (not just tags) so a Python role with no "python" tag
+    still matches a Python resume."""
+    return " ".join(
+        filter(None, [row.title or "", row.description or "", " ".join(_tags(row))])
+    ).lower()
+
+
+def _match_reason(matched: list[str], total: int) -> str:
+    if not matched:
+        return "No overlap with your listed skills yet — verify fit on the role page."
+    shown = ", ".join(matched[:4])
+    extra = len(matched) - 4
+    if extra > 0:
+        shown += f" +{extra} more"
+    return f"Matches {len(matched)} of your {total} skills: {shown}"
+
+
+def skill_match(row: Opportunity, profile_skills) -> dict:
+    """Which of the user's OWN skills this role emphasizes (token-aware over the
+    title, description, and tags). Never invents skills — only reports overlap —
+    and returns matched/missing plus a short human reason for the card. Empty
+    (reason=None) when no profile is saved."""
+    skills = [s for s in (profile_skills or []) if s]
+    if not skills:
+        return {"matched_skills": [], "missing_skills": [], "matched_count": 0,
+                "total_skills": 0, "reason": None}
+    text = _searchable_text(row)
+    matched = [s for s in skills if resume_parser.skill_in_text(s, text)]
+    missing = [s for s in skills if s not in matched]
+    return {
+        "matched_skills": matched,
+        "missing_skills": missing,
+        "matched_count": len(matched),
+        "total_skills": len(skills),
+        "reason": _match_reason(matched, len(skills)),
+    }
+
+
+def _score(row: Opportunity, profile_skills) -> float:
     key = _LABEL_TO_KEY.get(row.turkey_applicability_label, "unclear")
     score = {"strong": 100, "possible": 60, "unclear": 30, "no": 0}[key]
     if row.seniority_level in _JUNIOR_LEVELS:
@@ -619,12 +916,12 @@ def _score(row: Opportunity, profile_skills: set[str]) -> float:
         score += 10
     score += _CONFIDENCE_BONUS.get(row.source_confidence or "unknown", 0)
     if profile_skills:
-        overlap = len(profile_skills & {t.lower() for t in _tags(row)})
-        score += min(20, 5 * overlap)
+        overlap = skill_match(row, profile_skills)["matched_count"]
+        score += min(25, 5 * overlap)
     return score
 
 
-def serialize(row: Opportunity) -> dict:
+def serialize(row: Opportunity, profile_skills=None) -> dict:
     return {
         "id": row.id,
         "source": row.source,
@@ -635,6 +932,7 @@ def serialize(row: Opportunity) -> dict:
         "source_url": row.source_url,
         "target_region": row.target_region,
         "seniority_level": row.seniority_level,
+        "job_function": _function(row),
         "remote_policy": row.remote_policy,
         "country_scope": row.country_scope,
         "turkey_applicability_label": row.turkey_applicability_label,
@@ -647,12 +945,13 @@ def serialize(row: Opportunity) -> dict:
         "source_provider": row.source_provider,
         "source_confidence": row.source_confidence,
         "outreach_prefill": outreach_prefill(row),
+        "match": skill_match(row, profile_skills),
     }
 
 
 def list_opportunities(
     db: Session, *, region=None, seniority=None, remote_only=False,
-    applicability=None, tag=None, source=None, confidence=None,
+    applicability=None, tag=None, source=None, confidence=None, function=None,
     include_ineligible=False, profile_skills=None, limit=100,
 ) -> list[dict]:
     q = db.query(Opportunity)
@@ -677,13 +976,22 @@ def list_opportunities(
     if tag:
         tl = tag.lower()
         rows = [r for r in rows if any(tl == t.lower() for t in _tags(r))]
+    # Function filter (computed lazily so legacy rows filter too):
+    #   "all" (default) → engineering + business, hides creative/admin "other"
+    #   "software_engineering" / "business" / "other" → exactly that bucket
+    #   "any" → no filter at all
+    if function and function != "any":
+        if function == "all":
+            rows = [r for r in rows if _function(r) in (FUNCTION_SWE, FUNCTION_BUSINESS)]
+        else:
+            rows = [r for r in rows if _function(r) == function]
 
-    skills = {s.lower() for s in (profile_skills or [])}
+    skills = [s for s in (profile_skills or []) if s]
     rows.sort(
         key=lambda r: (_score(r, skills), r.date_seen or datetime.min),
         reverse=True,
     )
-    return [serialize(r) for r in rows[:limit]]
+    return [serialize(r, profile_skills=skills) for r in rows[:limit]]
 
 
 # ----- Outreach integration -----

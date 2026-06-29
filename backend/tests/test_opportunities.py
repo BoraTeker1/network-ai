@@ -61,6 +61,37 @@ def test_us_only_is_not_eligible():
     assert label == opp.LABEL_NO
 
 
+def test_usa_location_is_not_eligible():
+    # Plain "USA" / "North America" scope (no work-auth phrasing) is still hidden.
+    for loc in ("USA", "United States", "Remote (USA)", "North America"):
+        label, _ = opp.classify_turkey_applicability(
+            title="Junior Software Engineer", description="Remote role.",
+            location=loc, remote_policy="remote", country_scope=loc, seniority="junior",
+        )
+        assert label == opp.LABEL_NO, loc
+
+
+def test_us_company_hiring_worldwide_stays_strong():
+    # A US company hiring worldwide IS workable from Turkey — must not be hidden.
+    label, _ = opp.classify_turkey_applicability(
+        title="Junior Developer", description="We hire anywhere.",
+        location="Remote — Worldwide", remote_policy="remote",
+        country_scope="Worldwide", seniority="junior",
+    )
+    assert label == opp.LABEL_STRONG
+
+
+def test_usa_term_does_not_false_positive_on_description():
+    # "usability" in the description must not trip the US-location gate; the gate
+    # only reads location + country_scope, and this is a Turkey role.
+    label, _ = opp.classify_turkey_applicability(
+        title="Junior Frontend Engineer",
+        description="Improve usability and accessibility of our app.",
+        location="Istanbul, Turkey", remote_policy="hybrid", seniority="junior",
+    )
+    assert label == opp.LABEL_STRONG
+
+
 def test_eu_citizenship_is_not_eligible():
     label, _ = opp.classify_turkey_applicability(
         title="Graduate Engineer", description="Amsterdam. EU citizenship required.",
@@ -131,6 +162,48 @@ def test_ranking_prefers_strong_fit_junior(client):
     assert top["turkey_applicability_label"] != opp.LABEL_NO
 
 
+# ----- Resume-aware matching (Phase 1) -----
+
+def _two_equivalent_roles(db_session):
+    """Two same-tier (strong / junior / remote-worldwide) roles that differ only
+    by tech stack, so skill matching is the only ranking tiebreaker."""
+    opp.import_records(db_session, [
+        {"external_id": "py-role", "company": "PyCo", "title": "Junior Backend Engineer",
+         "location": "Remote — Worldwide", "remote": True, "remote_policy": "remote",
+         "country_scope": "Worldwide",
+         "description": "Junior backend role building APIs with Python and FastAPI."},
+        {"external_id": "go-role", "company": "GoCo", "title": "Junior Backend Engineer",
+         "location": "Remote — Worldwide", "remote": True, "remote_policy": "remote",
+         "country_scope": "Worldwide",
+         "description": "Junior backend role building services in Go and Kubernetes."},
+    ], source="test", is_sample=False)
+
+
+def test_match_breakdown_reports_overlapping_skills(db_session):
+    _two_equivalent_roles(db_session)
+    items = opp.list_opportunities(db_session, profile_skills=["Python", "FastAPI", "SQL"])
+    py = next(i for i in items if i["company"] == "PyCo")
+    assert set(py["match"]["matched_skills"]) == {"Python", "FastAPI"}
+    assert py["match"]["matched_count"] == 2
+    assert py["match"]["total_skills"] == 3
+    assert "Python" in py["match"]["reason"]
+
+
+def test_resume_skills_break_ranking_ties(db_session):
+    _two_equivalent_roles(db_session)
+    items = opp.list_opportunities(db_session, profile_skills=["Python", "FastAPI"])
+    companies = [i["company"] for i in items if i["company"] in ("PyCo", "GoCo")]
+    # The Python/FastAPI resume ranks the Python role above the otherwise-identical Go role.
+    assert companies.index("PyCo") < companies.index("GoCo")
+
+
+def test_no_profile_leaves_match_empty(db_session):
+    _two_equivalent_roles(db_session)
+    items = opp.list_opportunities(db_session)
+    assert all(i["match"]["reason"] is None for i in items)
+    assert all(i["match"]["matched_skills"] == [] for i in items)
+
+
 # ----- Public source resilience (no network in normal tests) -----
 
 def test_refresh_public_source_failure_is_graceful(client, monkeypatch):
@@ -138,6 +211,8 @@ def test_refresh_public_source_failure_is_graceful(client, monkeypatch):
         raise RuntimeError("network down")
 
     monkeypatch.setattr(opp, "fetch_arbeitnow", _boom)
+    monkeypatch.setattr(opp, "fetch_remotive", lambda limit=50: [])
+    monkeypatch.setattr(opp, "fetch_jobicy", lambda count=50: [])
     # Seed first so there's a feed to preserve.
     client.get("/opportunities")
     resp = client.post("/opportunities/refresh-public-sources")
@@ -166,6 +241,8 @@ def test_public_import_adapter_normalizes(client, monkeypatch):
         "created_at": "2026-06-01",
     }]
     monkeypatch.setattr(opp, "fetch_arbeitnow", lambda limit=50: sample)
+    monkeypatch.setattr(opp, "fetch_remotive", lambda limit=50: [])
+    monkeypatch.setattr(opp, "fetch_jobicy", lambda count=50: [])
     resp = client.post("/opportunities/refresh-public-sources")
     assert resp.status_code == 200 and resp.json()["created"] >= 1
     imported = client.get("/opportunities?source=arbeitnow").json()["items"]
@@ -344,6 +421,47 @@ def test_refresh_single_source(client, monkeypatch):
     assert client.post("/opportunities/refresh-source/nope").status_code == 404
 
 
+def test_refresh_all_pulls_ats_and_public(client, monkeypatch):
+    monkeypatch.setattr(opp, "fetch_lever", lambda token: _LEVER_SAMPLE)
+    monkeypatch.setattr(opp, "fetch_arbeitnow", lambda limit=50: [])
+    monkeypatch.setattr(opp, "fetch_remotive", lambda limit=50: _REMOTIVE_SAMPLE)
+    monkeypatch.setattr(opp, "fetch_jobicy", lambda count=50: _JOBICY_SAMPLE)
+    client.get("/opportunities")  # seed
+    body = client.post("/opportunities/refresh-all").json()
+    # Both halves ran and are reported.
+    assert "ats" in body and "public" in body
+    assert body["created"] >= 4              # 2 lever + remotive + jobicy
+    assert body["succeeded"] >= 3            # 3 enabled Lever boards
+    # Rows from both an ATS source and a public source are present.
+    assert client.get("/opportunities?source=lever").json()["items"]
+    assert client.get("/opportunities?source=remotive").json()["items"]
+
+
+def test_refresh_all_is_resilient(client, monkeypatch):
+    def _boom(*a, **k):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(opp, "fetch_lever", _boom)
+    monkeypatch.setattr(opp, "fetch_arbeitnow", _boom)
+    monkeypatch.setattr(opp, "fetch_remotive", lambda limit=50: _REMOTIVE_SAMPLE)
+    monkeypatch.setattr(opp, "fetch_jobicy", lambda count=50: [])
+    client.get("/opportunities")
+    body = client.post("/opportunities/refresh-all").json()
+    assert body["failed"] >= 1                # lever + arbeitnow failures counted
+    assert client.get("/opportunities").json()["count"] > 0  # seeded feed intact
+
+
+def test_registry_includes_desired_employers_as_directory_only(client):
+    by_id = {s["id"]: s for s in client.get("/opportunities/sources").json()["sources"]}
+    for cid in ("mckinsey", "bcg", "bain", "google", "amazon", "isbank"):
+        assert cid in by_id, cid
+        s = by_id[cid]
+        assert s["enabled"] is False          # directory only — never fetched
+        assert s["live"] is False
+        assert s["board_token"] is None       # no invented ATS token
+        assert s["careers_url"].startswith("http")
+
+
 # ----- US-only hidden by default; confidence labels -----
 
 def test_us_only_hidden_by_default_but_visible_on_request(client):
@@ -357,6 +475,117 @@ def test_us_only_hidden_by_default_but_visible_on_request(client):
 def test_seed_rows_have_sample_confidence(client):
     items = client.get("/opportunities?confidence=sample_demo").json()["items"]
     assert items and all(i["source_confidence"] == "sample_demo" for i in items)
+
+
+# ----- Job-function classifier + SWE filter -----
+
+def test_classify_job_function():
+    f = opp.classify_job_function
+    # Engineering
+    assert f(title="Senior Backend Engineer") == opp.FUNCTION_SWE
+    assert f(title="Junior iOS Developer") == opp.FUNCTION_SWE
+    assert f(title="DevOps Engineer") == opp.FUNCTION_SWE
+    assert f(title="Software Engineer, Performance Marketing") == opp.FUNCTION_SWE
+    assert f(title="Engineer", tags=["Engineering"]) == opp.FUNCTION_SWE
+    # Business
+    assert f(title="Business Analyst") == opp.FUNCTION_BUSINESS
+    assert f(title="Associate Consultant") == opp.FUNCTION_BUSINESS
+    assert f(title="Investment Banking Analyst") == opp.FUNCTION_BUSINESS
+    assert f(title="Management Trainee") == opp.FUNCTION_BUSINESS
+    assert f(title="Performance Marketing Specialist") == opp.FUNCTION_BUSINESS
+    assert f(title="Sales Engineer") == opp.FUNCTION_BUSINESS
+    # Creative / admin → other
+    assert f(title="Concept Artist") == opp.FUNCTION_OTHER
+    assert f(title="Executive Assistant") == opp.FUNCTION_OTHER
+    assert f(title="Product Designer") == opp.FUNCTION_OTHER
+    assert f(title="Data Scientist") == opp.FUNCTION_OTHER
+
+
+def test_function_filter_separates_eng_and_business(client):
+    payload = {"jobs": [
+        {"external_id": "swe-1", "company": "Acme TR", "title": "Junior Backend Engineer",
+         "location": "Istanbul, Turkey", "description": "x", "tags": ["Python"]},
+        {"external_id": "biz-1", "company": "Consult TR", "title": "Business Analyst",
+         "location": "Istanbul, Turkey", "description": "x", "tags": ["Strategy"]},
+        {"external_id": "art-1", "company": "Studio TR", "title": "Concept Artist",
+         "location": "Istanbul, Turkey", "description": "x", "tags": ["Art"]},
+    ], "source": "manual-import"}
+    client.post("/opportunities/import", json=payload)
+
+    def titles(q):
+        return {i["title"] for i in client.get(f"/opportunities?source=manual-import{q}").json()["items"]}
+
+    # Default (all = engineering + business) shows both, hides creative "other".
+    default = titles("")
+    assert "Junior Backend Engineer" in default and "Business Analyst" in default
+    assert "Concept Artist" not in default
+    # Each field shows only its bucket.
+    assert titles("&function=software_engineering") == {"Junior Backend Engineer"}
+    assert titles("&function=business") == {"Business Analyst"}
+    # function=any surfaces everything, incl. creative/admin.
+    assert "Concept Artist" in titles("&function=any")
+
+
+# ----- Remotive / Jobicy public remote-board adapters -----
+
+_REMOTIVE_SAMPLE = [{
+    "id": 555, "url": "https://remotive.com/remote-jobs/x-555",
+    "title": "Junior Backend Developer", "company_name": "Remotive Co",
+    "category": "Software Development", "tags": ["Python", "Django"],
+    "job_type": "full_time", "publication_date": "2026-06-20",
+    "candidate_required_location": "Worldwide",
+    "description": "<p>Remote worldwide junior role.</p>",
+}]
+
+_JOBICY_SAMPLE = [{
+    "id": 777, "url": "https://jobicy.com/jobs/x-777",
+    "jobTitle": "Junior Frontend Engineer", "companyName": "Jobicy Co",
+    "jobIndustry": ["Dev"], "jobType": ["full-time"], "jobGeo": "EMEA",
+    "jobLevel": "Junior", "jobExcerpt": "Remote EMEA.",
+    "jobDescription": "<p>Remote within EMEA.</p>", "pubDate": "2026-06-21",
+}]
+
+
+def test_remotive_record_mapping():
+    rec = opp._remotive_to_record(_REMOTIVE_SAMPLE[0])
+    assert rec["company"] == "Remotive Co"
+    assert rec["title"] == "Junior Backend Developer"
+    assert rec["remote_policy"] == "remote"
+    assert rec["country_scope"] == "Worldwide"
+    assert "<" not in rec["description"]          # HTML stripped
+    norm = opp.normalize_record(rec, source="remotive", is_sample=False)
+    assert norm["turkey_applicability_label"] == opp.LABEL_STRONG
+    assert norm["job_function"] == opp.FUNCTION_SWE
+
+
+def test_jobicy_record_mapping():
+    rec = opp._jobicy_to_record(_JOBICY_SAMPLE[0])
+    assert rec["company"] == "Jobicy Co"
+    assert rec["title"] == "Junior Frontend Engineer"
+    assert rec["remote_policy"] == "remote"
+    assert rec["country_scope"] == "EMEA"
+    assert "<" not in rec["description"]
+    norm = opp.normalize_record(rec, source="jobicy", is_sample=False)
+    assert norm["target_region"] == "europe"      # EMEA → europe
+    assert norm["turkey_applicability_label"] == opp.LABEL_STRONG
+    assert norm["job_function"] == opp.FUNCTION_SWE
+
+
+def test_refresh_public_sources_is_resilient_per_feed(client, monkeypatch):
+    def _boom(limit=50):
+        raise RuntimeError("arbeitnow down")
+
+    monkeypatch.setattr(opp, "fetch_arbeitnow", _boom)
+    monkeypatch.setattr(opp, "fetch_remotive", lambda limit=50: _REMOTIVE_SAMPLE)
+    monkeypatch.setattr(opp, "fetch_jobicy", lambda count=50: _JOBICY_SAMPLE)
+    client.get("/opportunities")  # seed
+    body = client.post("/opportunities/refresh-public-sources").json()
+    assert any("arbeitnow" in e for e in body["errors"])   # one feed failed
+    assert body["created"] >= 2                            # the other two imported
+    remotive = client.get("/opportunities?source=remotive").json()["items"]
+    assert remotive and remotive[0]["company"] == "Remotive Co"
+    jobicy = client.get("/opportunities?source=jobicy").json()["items"]
+    assert jobicy and jobicy[0]["company"] == "Jobicy Co"
 
 
 def test_dedupe_on_reimport(client):

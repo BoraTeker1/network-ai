@@ -62,10 +62,11 @@ Outcome + follow-up tracking rewards quality over volume.
 - **Universities, bootcamps & clubs:** team/cohort pricing for career centers.
 
 ### Intentionally NOT built yet
-Payments/billing, user accounts & auth, hosted deployment, any LLM API calls,
-LinkedIn integration of any kind, and email/automated sending. The MVP is
-deliberately local, deterministic, and offline so the product story — *honest,
-permission-based networking* — is provable, not promised.
+Payments/billing, user accounts & auth, hosted deployment, LinkedIn integration
+of any kind, and automated/bulk email sending. LLM drafting uses the **Claude
+Messages API** when `ANTHROPIC_API_KEY` is set and falls back to deterministic
+templates otherwise, so the product story — *honest, permission-based
+networking* — works fully offline and is provable, not promised.
 
 ---
 
@@ -78,10 +79,12 @@ through an approval queue. It is a copilot, never an autopilot:
 - **AI proposes, you approve.** Drafts land in `/emails` as proposed actions
   with a "why this contact" rationale, a quality checklist, and a risk
   checklist. Nothing is sent without your explicit approval.
-- **OpenAI Responses API only.** When `OPENAI_API_KEY` is set, drafts are
-  written by the model via the **Responses API** (no Chat Completions, no
-  Assistants, no Files/Vector Stores/embeddings). The key is read by the
-  backend only and is never logged, returned, or committed.
+- **Claude by default.** When `ANTHROPIC_API_KEY` is set, drafts are written by
+  Claude via the **Anthropic Messages API** (`claude-opus-4-8` by default,
+  env-configurable). `OPENAI_API_KEY` enables the OpenAI **Responses API** as an
+  optional fallback (no Chat Completions / Assistants / Files / Vector Stores /
+  embeddings). Keys are read by the backend only and never logged, returned, or
+  committed.
 - **Deterministic fallback.** With no key (or on any LLM error / invalid JSON),
   the app falls back to a deterministic template. The draft shows
   `llm_used: true/false` so you always know which path produced it.
@@ -194,8 +197,9 @@ staying strictly permission-based:
 
 - You **manually paste** the reply you received (from a recruiter, engineer,
   alumnus, or hiring manager). The app never reads LinkedIn or your inbox.
-- The backend (OpenAI **Responses API only**, with a deterministic keyword
-  fallback) returns a **summary**, a detected **intent** (positive, neutral,
+- The backend (**Claude Messages API** by default, OpenAI Responses API as
+  optional fallback, with a deterministic keyword fallback otherwise) returns a
+  **summary**, a detected **intent** (positive, neutral,
   negative, referral possible, interview related, asks for resume, asks for work
   authorization, needs follow-up), an **urgency**, a **recommended next move**,
   **risk notes**, a **suggested pipeline update**, and a drafted reply in both
@@ -210,27 +214,34 @@ staying strictly permission-based:
 
 ## Opportunities feed (`/opportunities`)
 
-A curated feed of **Turkey + Remote/EU roles for junior Turkish engineers** that
-flows directly into the outreach copilot. It is **not** a generic job board.
+A feed of **real Turkey + Remote/EU listings for junior Turkish engineers** that
+flows directly into the outreach copilot. It is **not** a generic job board, and
+it serves **real listings only** — no fake/sample data.
 
-- **Compliant sources only.** A curated **sample** seed (clearly labelled in the
-  UI); **real Turkish-company listings** via their official public Lever
-  job-board APIs (`POST /opportunities/refresh-turkish-sources` — e.g. Dream
-  Games, Codeway; add more by board token in `LEVER_TURKISH_COMPANIES`); public
-  EU job-board APIs (Arbeitnow — `POST /opportunities/refresh-public-sources`);
-  and a manual JSON import endpoint (`POST /opportunities/import`). These are the
-  official embed APIs companies publish — **no scraping** of LinkedIn,
-  Kariyer.net, Youthall, Techcareer, Coderspace, or any protected site; no
-  browser automation, no auto-apply, no auto-send.
-- **`GET /opportunities` never makes a network call** — it serves stored rows
-  (seeded on first use). Fetching public listings is a separate, resilient action
-  (`POST /opportunities/refresh-public-sources`); if it fails, the curated feed
-  still works.
+- **Compliant sources, pulled in one click.** "Refresh live sources"
+  (`POST /opportunities/refresh-all`) fetches from companies' **official public
+  ATS APIs** (Lever — Dream Games, Codeway, Commencis; plus Greenhouse/Ashby
+  adapters) **and** keyless **public job APIs** (Arbeitnow, Remotive, Jobicy).
+  A manual JSON import endpoint (`POST /opportunities/import`) is also available.
+  These are the official embed APIs companies publish — **no scraping** of
+  LinkedIn, Kariyer.net, Youthall, Techcareer, Coderspace, or any protected site;
+  no browser automation, no auto-apply, no auto-send. Each fetch is independently
+  resilient: one source failing never breaks the others.
+- **`GET /opportunities` never makes a network call** — it serves stored rows.
+  The app does **not** auto-seed any demo data; an empty feed prompts you to
+  refresh live sources.
+- **Most-desired employers as a directory.** Companies without a public ATS
+  (Google, Amazon, Microsoft, McKinsey/BCG/Bain, İş Bankası, Garanti BBVA,
+  Akbank, Trendyol, Getir, …) are listed with a careers link only — **no jobs are
+  fetched** and **no board tokens are invented**.
+- **Level + Field lanes.** Tabs separate **New grad / Internships / Junior** and
+  **Engineering / Business**, so tech and business students each see only relevant
+  roles (creative/admin "other" roles are hidden by default).
 - **Conservative "Turkey-applicability" label** on every role — *Strong fit /
   Possibly eligible / Unclear / Probably not eligible* — with a one-line reason.
-  It never claims eligibility unless the listing's text supports it (US-work-auth
-  or EU-citizenship-only roles are flagged *Probably not eligible*). **Always
-  verify eligibility on the company page** — the label is a guess, not advice.
+  US / North-America-located and EU-citizenship-only roles are flagged *Probably
+  not eligible* and hidden by default. **Always verify eligibility on the company
+  page** — the label is a guess, not advice.
 - **"Draft outreach"** on a role prefills the `/outreach` copilot (company, role,
   description, target region, and language default — Turkish for domestic roles,
   English for remote/EU/global, with the Turkey/CET line on for remote/EU).
@@ -320,6 +331,20 @@ cd backend
 
 ## API endpoints
 
+**Primary (Turkey → remote/EU) endpoints:**
+
+| Method | Path                                   | Purpose                              |
+| ------ | -------------------------------------- | ------------------------------------ |
+| GET    | `/opportunities`                       | Ranked feed (filters: `region`, `seniority`, `function`, `applicability`, …) |
+| GET    | `/opportunities/sources`               | Source registry (live ATS + directory) |
+| POST   | `/opportunities/refresh-all`           | Pull all sources: ATS + public APIs  |
+| POST   | `/opportunities/refresh-sources`       | Refresh official ATS boards only      |
+| POST   | `/opportunities/refresh-public-sources`| Refresh Arbeitnow / Remotive / Jobicy |
+| POST   | `/opportunities/import`                | Manual JSON import (no scraping)     |
+| POST   | `/outreach/draft-from-paste`           | Paste-a-JD bilingual outreach draft  |
+
+**Legacy (U.S. new-grad layer, off primary nav):**
+
 | Method | Path                                   | Purpose                              |
 | ------ | -------------------------------------- | ------------------------------------ |
 | GET    | `/health`                              | Health check                         |
@@ -399,8 +424,8 @@ _Add screenshots here:_
   there is **no scraping** of LinkedIn or any website.
 - Gmail sending is **disabled by default**; this MVP prefers copy / manual send.
 - No auto-send and no bulk-send anywhere in the product.
-- The LLM uses the **OpenAI Responses API only** (no Chat Completions /
-  Assistants / Files / Vector Stores / embeddings).
+- LLM drafting uses the **Claude Messages API** by default (OpenAI Responses API
+  as an optional fallback); deterministic templates are used when no key is set.
 - This is a **local-first demo**, not production SaaS. A real version needs:
   auth, encryption at rest, OAuth for any sending, rate limits, an
   unsubscribe / do-not-contact list, a privacy policy, and a proper compliance

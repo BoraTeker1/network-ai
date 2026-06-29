@@ -66,6 +66,7 @@ def run_lightweight_migrations() -> None:
         "opportunities": {
             "source_provider": "ALTER TABLE opportunities ADD COLUMN source_provider VARCHAR",
             "source_confidence": "ALTER TABLE opportunities ADD COLUMN source_confidence VARCHAR",
+            "job_function": "ALTER TABLE opportunities ADD COLUMN job_function VARCHAR",
         },
     }
 
