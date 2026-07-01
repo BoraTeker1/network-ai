@@ -55,7 +55,7 @@ def test_mission_empty_is_never_blank(client):
 
 def test_mission_service_matches_endpoint(client, db_session):
     """The service and the HTTP endpoint return the same shape."""
-    direct = mission.build_mission(db_session)
+    direct = mission.build_mission(db_session, client.user["id"])
     via_http = client.get("/dashboard/mission").json()
     assert set(direct.keys()) == set(via_http.keys())
 

@@ -12,15 +12,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DEMO_USER_ID, Profile
+from ..deps import optional_user, require_user
+from ..models import Profile, User
 from ..schemas import OpportunityImportIn
 from ..services import opportunities
+from ..services.rate_limit import rate_limit
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
 
-def _profile_skills(db: Session) -> list[str]:
-    profile = db.query(Profile).filter(Profile.user_id == DEMO_USER_ID).first()
+def _profile_skills(db: Session, user: User | None) -> list[str]:
+    if user is None:
+        return []
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     if profile is None or not profile.skills:
         return []
     try:
@@ -32,6 +36,7 @@ def _profile_skills(db: Session) -> list[str]:
 @router.get("")
 def list_opportunities(
     db: Session = Depends(get_db),
+    user: User | None = Depends(optional_user),
     region: str | None = Query(None),
     seniority: str | None = Query(None),
     remote: bool = Query(False),
@@ -53,7 +58,7 @@ def list_opportunities(
         db, region=region, seniority=seniority, remote_only=remote,
         applicability=applicability, tag=tag, source=source, confidence=confidence,
         function=function, include_ineligible=include_ineligible,
-        profile_skills=_profile_skills(db), limit=limit,
+        profile_skills=_profile_skills(db, user), limit=limit,
     )
     return {
         "count": len(items),
@@ -70,7 +75,7 @@ def list_sources():
 
 
 @router.post("/import")
-def import_opportunities(payload: OpportunityImportIn, db: Session = Depends(get_db)):
+def import_opportunities(payload: OpportunityImportIn, db: Session = Depends(get_db), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Import curated jobs from pasted JSON (e.g. from company career pages).
     No scraping — the user supplies the records."""
     return opportunities.import_records(
@@ -82,14 +87,14 @@ def import_opportunities(payload: OpportunityImportIn, db: Session = Depends(get
 
 
 @router.post("/refresh-public-sources")
-def refresh_public_sources(db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=100)):
+def refresh_public_sources(db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=100), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Fetch + store public job-board listings (Arbeitnow, no key). Resilient:
     on failure it reports the error and leaves the seeded feed intact."""
     return opportunities.refresh_public_sources(db, limit=limit)
 
 
 @router.post("/refresh-sources")
-def refresh_sources(db: Session = Depends(get_db)):
+def refresh_sources(db: Session = Depends(get_db), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Refresh all ENABLED official Turkish/Turkey-relevant ATS sources (Lever/
     Greenhouse/Ashby public APIs — no key, not scraping). Per-source status;
     one source failing never breaks the others."""
@@ -97,7 +102,7 @@ def refresh_sources(db: Session = Depends(get_db)):
 
 
 @router.post("/refresh-source/{source_id}")
-def refresh_source(source_id: str, db: Session = Depends(get_db)):
+def refresh_source(source_id: str, db: Session = Depends(get_db), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Refresh a single registry source by id."""
     result = opportunities.refresh_source(db, source_id)
     if result is None:
@@ -106,13 +111,13 @@ def refresh_source(source_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh-all")
-def refresh_all(db: Session = Depends(get_db)):
+def refresh_all(db: Session = Depends(get_db), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Refresh everything: official ATS sources + public job APIs (Arbeitnow/
     Remotive/Jobicy) in one action. Resilient per source."""
     return opportunities.refresh_all(db)
 
 
 @router.post("/refresh-turkish-sources")
-def refresh_turkish_sources(db: Session = Depends(get_db)):
+def refresh_turkish_sources(db: Session = Depends(get_db), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Legacy alias for /refresh-sources (kept for back-compat)."""
     return opportunities.refresh_turkish_sources(db)

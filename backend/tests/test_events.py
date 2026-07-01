@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.models import DEMO_USER_ID, Goal, Job
+from app.models import Goal, Job
 from app.services import events
 
 
@@ -67,7 +67,7 @@ def test_search_context_built_from_strongest_match(client, seeded_job, db_sessio
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
 
-    context, best = events.build_search_context(db_session)
+    context, best = events.build_search_context(db_session, client.user["id"])
     assert best is not None
     assert context["company"] == "Acme"
     assert context["role_family"] == "Backend engineering"
@@ -244,7 +244,7 @@ def test_user_location_overrides_remote_job(client, remote_job, monkeypatch, db_
     assert client.post("/jobs/match-all").status_code == 200
 
     # With an explicit ?location=Boston, the remote job is overridden.
-    context, _ = events.build_search_context(db_session, location_override="Boston")
+    context, _ = events.build_search_context(db_session, client.user["id"], location_override="Boston")
     assert context["city"] == "Boston"
     assert context["is_remote"] is False
 
@@ -252,11 +252,11 @@ def test_user_location_overrides_remote_job(client, remote_job, monkeypatch, db_
 def test_goal_city_used_when_job_is_remote(client, remote_job, db_session):
     _save_profile(client)
     assert client.post("/jobs/match-all").status_code == 200
-    db_session.add(Goal(user_id=DEMO_USER_ID, target_role="Backend Engineer",
+    db_session.add(Goal(user_id=client.user["id"], target_role="Backend Engineer",
                         target_location="Denver"))
     db_session.commit()
 
-    context, _ = events.build_search_context(db_session)
+    context, _ = events.build_search_context(db_session, client.user["id"])
     assert context["city"] == "Denver"
     assert context["is_remote"] is False
 

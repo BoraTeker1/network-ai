@@ -208,8 +208,14 @@ def test_no_profile_leaves_match_empty(db_session):
 
 def test_live_sources_are_the_verified_set():
     live = {s["id"] for s in opp.list_sources() if s["live"]}
-    assert live == {"dreamgames", "codeway", "commencis",
-                    "trendyol", "peak", "midas", "picus"}
+    assert live == {
+        # Turkish boards (Lever)
+        "dreamgames", "codeway", "commencis", "trendyol", "peak", "midas",
+        "picus", "iyzico",
+        # Strong EU / global-remote boards (verified 2026-07-01)
+        "canonical", "remotecom", "gitlab", "spotify", "adyen", "n26",
+        "hellofresh", "celonis", "doctolib", "bitpanda", "typeform",
+    }
 
 
 def test_every_live_source_has_a_real_provider_and_token():

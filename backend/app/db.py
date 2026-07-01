@@ -46,6 +46,16 @@ def run_lightweight_migrations() -> None:
             "outcome": "ALTER TABLE messages ADD COLUMN outcome VARCHAR",
             "follow_up_status": "ALTER TABLE messages ADD COLUMN follow_up_status VARCHAR",
             "follow_up_due_date": "ALTER TABLE messages ADD COLUMN follow_up_due_date VARCHAR",
+            # Outreach-copilot context for pipeline items with no legacy Job row.
+            "company": "ALTER TABLE messages ADD COLUMN company VARCHAR",
+            "title": "ALTER TABLE messages ADD COLUMN title VARCHAR",
+            "subject": "ALTER TABLE messages ADD COLUMN subject VARCHAR",
+            "channel": "ALTER TABLE messages ADD COLUMN channel VARCHAR",
+            "language": "ALTER TABLE messages ADD COLUMN language VARCHAR",
+            "job_url": "ALTER TABLE messages ADD COLUMN job_url VARCHAR",
+            "contact_name": "ALTER TABLE messages ADD COLUMN contact_name VARCHAR",
+            "contact_title": "ALTER TABLE messages ADD COLUMN contact_title VARCHAR",
+            "opportunity_id": "ALTER TABLE messages ADD COLUMN opportunity_id INTEGER",
         },
         # Richer normalized job fields introduced with the newgrad-jobs.com adapter.
         "jobs": {

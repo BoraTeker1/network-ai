@@ -1,22 +1,45 @@
 """Pydantic schemas for request/response bodies.
 
-Skeleton level — just enough to make the API browsable and typed.
+Input fields carry max_length limits so oversized pastes are rejected at the
+edge (422) instead of reaching parsers, the DB, or an LLM prompt.
 """
 
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Shared input-size ceilings (characters). Generous for real use, hostile to abuse.
+MAX_RESUME_CHARS = 60_000
+MAX_JD_CHARS = 20_000
+MAX_BODY_CHARS = 10_000
+MAX_SUBJECT_CHARS = 300
+MAX_NOTE_CHARS = 2_000
+MAX_NAME_CHARS = 300
+MAX_EMAIL_CHARS = 320
+MAX_URL_CHARS = 1_000
+
+
+# ----- Auth -----
+
+class SignupIn(BaseModel):
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class LoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+    password: str = Field(min_length=1, max_length=200)
 
 
 # ----- Profile -----
 
 class ResumeTextIn(BaseModel):
-    resume_text: str
+    resume_text: str = Field(max_length=MAX_RESUME_CHARS)
 
 
 class ProfileCreate(BaseModel):
-    raw_resume: str
+    raw_resume: str = Field(max_length=MAX_RESUME_CHARS)
 
 
 class ProfileOut(BaseModel):
@@ -85,27 +108,27 @@ class MessageCreate(BaseModel):
 
 class MessageGenerateIn(BaseModel):
     job_id: int
-    contact_name: Optional[str] = None
-    contact_title: Optional[str] = None
+    contact_name: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    contact_title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
 
 
 class MessagePatch(BaseModel):
-    draft_text: str
+    draft_text: str = Field(max_length=MAX_BODY_CHARS)
 
 
 class OutcomeIn(BaseModel):
-    outcome: str
-    note: Optional[str] = None
+    outcome: str = Field(max_length=50)
+    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
 
 
 class FollowUpIn(BaseModel):
-    status: str                       # one of FOLLOW_UP_STATUSES
-    due_date: Optional[str] = None    # ISO date string (YYYY-MM-DD), optional
+    status: str = Field(max_length=50)               # one of FOLLOW_UP_STATUSES
+    due_date: Optional[str] = Field(None, max_length=20)  # ISO date (YYYY-MM-DD)
 
 
 class MessageUpdate(BaseModel):
-    content: Optional[str] = None
-    status: Optional[str] = None
+    content: Optional[str] = Field(None, max_length=MAX_BODY_CHARS)
+    status: Optional[str] = Field(None, max_length=50)
 
 
 class MessageOut(BaseModel):
@@ -125,27 +148,27 @@ class MessageOut(BaseModel):
 # ----- Goals -----
 
 class GoalIn(BaseModel):
-    target_role: Optional[str] = None
-    target_location: Optional[str] = None
-    target_company_type: Optional[str] = None
-    outreach_goal: Optional[str] = None
-    tone_preference: Optional[str] = None
+    target_role: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    target_location: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    target_company_type: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    outreach_goal: Optional[str] = Field(None, max_length=50)
+    tone_preference: Optional[str] = Field(None, max_length=50)
     max_contacts_per_company: Optional[int] = 3
     preferred_contact_types: Optional[List[str]] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
 
 
 # ----- Contacts -----
 
 class ContactManualIn(BaseModel):
-    name: str
-    title: Optional[str] = None
-    company: Optional[str] = None
-    email: Optional[str] = None
-    linkedin_url: Optional[str] = None
-    contact_type: Optional[str] = None
+    name: str = Field(max_length=MAX_NAME_CHARS)
+    title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    email: Optional[str] = Field(None, max_length=MAX_EMAIL_CHARS)
+    linkedin_url: Optional[str] = Field(None, max_length=MAX_URL_CHARS)
+    contact_type: Optional[str] = Field(None, max_length=50)
     email_confidence: Optional[int] = None
-    source_note: Optional[str] = None
+    source_note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
     job_id: Optional[int] = None
 
 
@@ -166,11 +189,11 @@ class EmailDraftIn(BaseModel):
 
 
 class EmailPatchIn(BaseModel):
-    subject: Optional[str] = None
-    body: Optional[str] = None
-    outcome: Optional[str] = None
-    follow_up_status: Optional[str] = None
-    follow_up_due_date: Optional[str] = None
+    subject: Optional[str] = Field(None, max_length=MAX_SUBJECT_CHARS)
+    body: Optional[str] = Field(None, max_length=MAX_BODY_CHARS)
+    outcome: Optional[str] = Field(None, max_length=50)
+    follow_up_status: Optional[str] = Field(None, max_length=50)
+    follow_up_due_date: Optional[str] = Field(None, max_length=20)
 
 
 class GmailSendIn(BaseModel):
@@ -191,7 +214,7 @@ class LinkedInDraftIn(BaseModel):
 
 class NextMoveIn(BaseModel):
     # The reply the user RECEIVED, pasted in manually (never auto-read).
-    reply_text: str
+    reply_text: str = Field(max_length=MAX_BODY_CHARS)
     # Optional links to existing pipeline data for richer context + a target to
     # update when the user confirms an outcome.
     job_id: Optional[int] = None
@@ -203,31 +226,52 @@ class NextMoveIn(BaseModel):
 # ----- Paste-a-JD bilingual outreach (Turkey → remote/EU wedge) -----
 
 class OutreachContactIn(BaseModel):
-    name: Optional[str] = None
-    title: Optional[str] = None
-    company: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
 
 
 class OutreachPasteIn(BaseModel):
     # The job description the user pasted in manually (never scraped).
-    jd_text: str
+    jd_text: str = Field(max_length=MAX_JD_CHARS)
     contact: OutreachContactIn = OutreachContactIn()
     language: str = "en"             # "en" | "tr"
     channel: str = "email"           # "email" | "linkedin"
     tone: Optional[str] = "warm_low_pressure"
 
     # Optional explicit company/role (else inferred from the pasted JD).
-    company: Optional[str] = None
-    role: Optional[str] = None
+    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    role: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
 
     # Remote/EU + visa/timezone framing (all opt-in; nothing is invented).
-    target_region: Optional[str] = None        # "remote" | "europe" | "global" | "turkey"
-    based_in: Optional[str] = "Turkey"
-    timezone_overlap: Optional[str] = None      # e.g. "Istanbul time with CET overlap"
-    work_authorization_note: Optional[str] = None  # user-provided text only
+    target_region: Optional[str] = Field(None, max_length=20)  # remote|europe|global|turkey
+    based_in: Optional[str] = Field("Turkey", max_length=100)
+    timezone_overlap: Optional[str] = Field(None, max_length=200)
+    work_authorization_note: Optional[str] = Field(None, max_length=500)  # user text only
     include_location_line: bool = False
     include_work_auth_line: bool = False
-    skill_highlight: Optional[str] = None       # optional user override line
+    skill_highlight: Optional[str] = Field(None, max_length=500)  # optional override line
+
+
+class OutreachSaveIn(BaseModel):
+    """Save a generated outreach draft as a tracked pipeline item.
+
+    Reuses the Message model + its manual approval/outcome/follow-up workflow.
+    Nothing is ever sent — this only persists the reviewed draft so the user can
+    revisit, copy, mark-sent-manually, mark-replied, and follow up.
+    """
+
+    body: str = Field(max_length=MAX_BODY_CHARS)
+    subject: Optional[str] = Field(None, max_length=MAX_SUBJECT_CHARS)
+    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    role: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    channel: str = Field("email", max_length=20)      # "email" | "linkedin"
+    language: str = Field("en", max_length=10)        # "en" | "tr"
+    opportunity_id: Optional[int] = None   # source opportunity, if drafted from one
+    job_url: Optional[str] = Field(None, max_length=MAX_URL_CHARS)
+    contact_name: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    contact_title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    status: str = Field("copied", max_length=30)      # initial pipeline status
 
 
 # ----- Opportunities (curated Turkey + remote/EU feed) -----
@@ -242,20 +286,20 @@ class OpportunityImportIn(BaseModel):
 # ----- Meetings (people you actually met — presence tracking) -----
 
 class MeetingIn(BaseModel):
-    name: str
-    title: Optional[str] = None
-    company: Optional[str] = None
-    where_met: Optional[str] = None          # event/place, e.g. "JS Conf NY"
-    met_on: Optional[str] = None             # ISO date (YYYY-MM-DD); defaults to today
+    name: str = Field(max_length=MAX_NAME_CHARS)
+    title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
+    where_met: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)  # event/place
+    met_on: Optional[str] = Field(None, max_length=20)   # ISO date; defaults to today
     job_id: Optional[int] = None             # the opportunity this relates to
-    contact_type: Optional[str] = None       # one of CONTACT_TYPES
-    linkedin_url: Optional[str] = None
-    note: Optional[str] = None
+    contact_type: Optional[str] = Field(None, max_length=50)  # one of CONTACT_TYPES
+    linkedin_url: Optional[str] = Field(None, max_length=MAX_URL_CHARS)
+    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
 
 
 class MeetingPatch(BaseModel):
     followed_up: Optional[bool] = None
-    note: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
 
 
 # ----- Generic -----

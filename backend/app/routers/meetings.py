@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import CONTACT_TYPES, DEMO_USER_ID, Job, Meeting, MomentumEvent
+from ..deps import require_user
+from ..models import CONTACT_TYPES, Job, Meeting, MomentumEvent, User
 from ..schemas import MeetingIn, MeetingPatch
 from ..services import momentum
 
@@ -39,7 +40,7 @@ def _serialize(m: Meeting) -> dict:
 
 
 @router.post("")
-def log_meeting(payload: MeetingIn, db: Session = Depends(get_db)):
+def log_meeting(payload: MeetingIn, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Log a person you met. Awards Momentum ('Person met') exactly once."""
     name = (payload.name or "").strip()
     if not name:
@@ -57,7 +58,7 @@ def log_meeting(payload: MeetingIn, db: Session = Depends(get_db)):
         company = job.company if job else None
 
     meeting = Meeting(
-        user_id=DEMO_USER_ID,
+        user_id=user.id,
         job_id=payload.job_id,
         name=name,
         title=(payload.title or "").strip() or None,
@@ -73,25 +74,25 @@ def log_meeting(payload: MeetingIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(meeting)
 
-    award = momentum.award(db, "meeting", meeting.id, "person_met")
+    award = momentum.award(db, user.id, "meeting", meeting.id, "person_met")
     result = _serialize(meeting)
     result["momentum"] = award
     return result
 
 
 @router.get("")
-def list_meetings(job_id: int | None = None, db: Session = Depends(get_db)):
+def list_meetings(job_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """All logged meetings (newest first), optionally filtered to one opportunity."""
-    q = db.query(Meeting).filter(Meeting.user_id == DEMO_USER_ID)
+    q = db.query(Meeting).filter(Meeting.user_id == user.id)
     if job_id is not None:
         q = q.filter(Meeting.job_id == job_id)
     return [_serialize(m) for m in q.order_by(Meeting.id.desc()).all()]
 
 
 @router.patch("/{meeting_id}")
-def patch_meeting(meeting_id: int, payload: MeetingPatch, db: Session = Depends(get_db)):
+def patch_meeting(meeting_id: int, payload: MeetingPatch, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Update a meeting (mark followed-up, edit the note)."""
-    m = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    m = db.query(Meeting).filter(Meeting.id == meeting_id, Meeting.user_id == user.id).first()
     if m is None:
         raise HTTPException(status_code=404, detail=f"Meeting {meeting_id} not found")
     if payload.followed_up is not None:
@@ -104,12 +105,13 @@ def patch_meeting(meeting_id: int, payload: MeetingPatch, db: Session = Depends(
 
 
 @router.delete("/{meeting_id}")
-def delete_meeting(meeting_id: int, db: Session = Depends(get_db)):
+def delete_meeting(meeting_id: int, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Delete a meeting and remove its Momentum so points/funnel stay honest."""
-    m = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    m = db.query(Meeting).filter(Meeting.id == meeting_id, Meeting.user_id == user.id).first()
     if m is None:
         raise HTTPException(status_code=404, detail=f"Meeting {meeting_id} not found")
     db.query(MomentumEvent).filter(
+        MomentumEvent.user_id == user.id,
         MomentumEvent.subject_type == "meeting",
         MomentumEvent.subject_id == meeting_id,
     ).delete()

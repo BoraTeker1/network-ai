@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   api,
+  ApiError,
   EmailDraft,
   Message,
   NextMoveAnalysis,
 } from "@/lib/api";
+import UpgradeCallout from "@/components/UpgradeCallout";
 import {
   PageHeader,
   ErrorBanner,
   QualityChecklist,
-  WhyNotSpam,
+  TrustLine,
+  WorkflowHint,
 } from "@/components/ui";
 import { useMomentum } from "@/components/MomentumProvider";
 
@@ -58,6 +62,7 @@ export default function NextMovePage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [busyOutcome, setBusyOutcome] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planLimit, setPlanLimit] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,7 +116,11 @@ export default function NextMovePage() {
       setBody(a.drafted_email.body);
       setShortMsg(a.drafted_short_message);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
+      if (e instanceof ApiError && e.code === "plan_limit") {
+        setPlanLimit(e.message);
+      } else {
+        setError(e instanceof Error ? e.message : "Analysis failed");
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -155,12 +164,16 @@ export default function NextMovePage() {
         subtitle="Got a reply from a recruiter, engineer, alumnus, or hiring manager? Paste it in. Next Move AI reads only what you paste — it never auto-reads your inbox — then summarizes the reply, detects intent, and drafts a response you review, edit, and send yourself."
       />
 
-      <div className="mt-4">
-        <WhyNotSpam compact />
+      <div className="mt-4 space-y-3">
+        <WorkflowHint>
+          Paste a reply, <strong>link it to a tracked outreach item</strong>, and get your next
+          response drafted.
+        </WorkflowHint>
+        <TrustLine />
       </div>
 
       {/* Input */}
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Paste the reply you received
         </label>
@@ -175,18 +188,28 @@ export default function NextMovePage() {
             <label className="text-xs font-medium text-slate-500">
               Link a pipeline item (optional — enables outcome + Momentum)
             </label>
-            <select
-              value={linkedKey}
-              onChange={(e) => setLinkedKey(e.target.value)}
-              className="mt-1 block w-72 max-w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">No linked item</option>
-              {linkOptions.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            {linkOptions.length === 0 ? (
+              <p className="mt-1 w-72 max-w-full rounded-md border border-dashed border-slate-300 px-2 py-2 text-xs text-slate-500">
+                No tracked outreach yet.{" "}
+                <Link href="/pipeline" className="font-medium text-blue-600 hover:underline">
+                  Save a draft to your pipeline
+                </Link>{" "}
+                to link replies here.
+              </p>
+            ) : (
+              <select
+                value={linkedKey}
+                onChange={(e) => setLinkedKey(e.target.value)}
+                className="mt-1 block w-72 max-w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">No linked item</option>
+                {linkOptions.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <button
             onClick={analyze}
@@ -199,6 +222,7 @@ export default function NextMovePage() {
       </section>
 
       <ErrorBanner message={error} />
+      {planLimit && <UpgradeCallout message={planLimit} />}
       {notice && (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
           {notice}

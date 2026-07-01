@@ -33,7 +33,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..models import DEMO_USER_ID, Goal
+from ..models import Goal
 from . import matcher
 
 # ----- Controlled vocabularies -----
@@ -322,22 +322,22 @@ def _matched_terms(text: str, context: dict) -> list[str]:
 
 # ----- Search context (from the strongest match + goal) -----
 
-def _best_match(db: Session) -> dict | None:
-    ranked = matcher.ranked_matches(db, limit=1)
+def _best_match(db: Session, user_id: str) -> dict | None:
+    ranked = matcher.ranked_matches(db, user_id, limit=1)
     return ranked[0] if ranked else None
 
 
-def _goal(db: Session) -> Goal | None:
+def _goal(db: Session, user_id: str) -> Goal | None:
     return (
         db.query(Goal)
-        .filter(Goal.user_id == DEMO_USER_ID)
+        .filter(Goal.user_id == user_id)
         .order_by(Goal.id.desc())
         .first()
     )
 
 
 def build_search_context(
-    db: Session, *, location_override: str | None = None
+    db: Session, user_id: str, *, location_override: str | None = None
 ) -> tuple[dict, dict | None]:
     """Build the keyword/location context that drives provider + manual search.
 
@@ -345,8 +345,8 @@ def build_search_context(
     falling back to the goal and then to generic tech-networking terms, so the
     feature is never blank.
     """
-    best = _best_match(db)
-    goal = _goal(db)
+    best = _best_match(db, user_id)
+    goal = _goal(db, user_id)
 
     job_title = (best or {}).get("title")
     company = (best or {}).get("company")
@@ -673,6 +673,7 @@ def _rank_score(rec: EventRecommendation, context: dict) -> float:
 
 def recommend_events(
     db: Session,
+    user_id: str,
     *,
     location: str | None = None,
     radius_miles: int = 50,
@@ -690,7 +691,7 @@ def recommend_events(
     max_results = max(1, min(int(max_results), 50))
     radius_miles = max(1, min(int(radius_miles), 500))
 
-    context, best = build_search_context(db, location_override=location)
+    context, best = build_search_context(db, user_id, location_override=location)
     filters = {
         "location": context["location"],   # human-readable (may be "Remote")
         "city": context["city"],           # normalized real city, or None

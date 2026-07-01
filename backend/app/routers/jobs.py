@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Job
+from ..deps import require_user
+from ..models import Job, User
 from ..schemas import NewGradIngestIn
 from ..services.job_ingestion import ingest_jobs
 from ..services import matcher, newgrad_jobs, strategy
@@ -64,7 +65,7 @@ def _serialize(job: Job) -> dict:
 # ----- Ingestion -----
 
 @router.post("/ingest/simplify")
-def ingest_simplify(db: Session = Depends(get_db)):
+def ingest_simplify(db: Session = Depends(get_db), _user: User = Depends(require_user)):
     """Fetch + parse + store deduplicated jobs from the SimplifyJobs README."""
     try:
         result = ingest_jobs(db)
@@ -80,7 +81,9 @@ def ingest_simplify(db: Session = Depends(get_db)):
 
 @router.post("/ingest/newgrad-jobs")
 def ingest_newgrad(
-    payload: NewGradIngestIn | None = None, db: Session = Depends(get_db)
+    payload: NewGradIngestIn | None = None,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_user),
 ):
     """Fetch + parse + store deduplicated jobs from newgrad-jobs.com category
     pages. Permission-first and conservative: only newgrad-jobs.com is fetched,
@@ -102,24 +105,24 @@ def ingest_newgrad(
 # ----- Matching / ranking (static paths first) -----
 
 @router.post("/match-all")
-def match_all_jobs(db: Session = Depends(get_db)):
+def match_all_jobs(db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Score every stored job against the saved demo-user profile."""
     try:
-        return matcher.match_all(db)
+        return matcher.match_all(db, user.id)
     except ValueError as exc:  # no profile saved yet
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/matches/ranked")
-def list_ranked_matches(limit: int = 100, db: Session = Depends(get_db)):
+def list_ranked_matches(limit: int = 100, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Return jobs with match scores, highest first."""
-    return matcher.ranked_matches(db, limit=limit)
+    return matcher.ranked_matches(db, user.id, limit=limit)
 
 
 # ----- Reads -----
 
 @router.get("")
-def list_jobs(limit: int = 100, offset: int = 0, db: Session = Depends(get_db)):
+def list_jobs(limit: int = 100, offset: int = 0, db: Session = Depends(get_db), _user: User = Depends(require_user)):
     """Return stored jobs as a clean JSON array (newest first)."""
     jobs = (
         db.query(Job)
@@ -132,10 +135,10 @@ def list_jobs(limit: int = 100, offset: int = 0, db: Session = Depends(get_db)):
 
 
 @router.post("/{job_id}/match")
-def match_one_job(job_id: int, db: Session = Depends(get_db)):
+def match_one_job(job_id: int, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Score a single job against the saved demo-user profile (upsert)."""
     try:
-        return matcher.match_job(db, job_id)
+        return matcher.match_job(db, job_id, user.id)
     except ValueError as exc:  # no profile saved yet
         raise HTTPException(status_code=400, detail=str(exc))
     except LookupError as exc:  # job not found
@@ -143,7 +146,7 @@ def match_one_job(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}/contact-searches")
-def job_contact_searches(job_id: int, db: Session = Depends(get_db)):
+def job_contact_searches(job_id: int, db: Session = Depends(get_db), _user: User = Depends(require_user)):
     """Manual LinkedIn/Google contact-search suggestions for a job's company."""
     job = db.query(Job).filter(Job.id == job_id).first()
     if job is None:
@@ -156,7 +159,7 @@ def job_contact_searches(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}/strategy")
-def job_strategy(job_id: int, db: Session = Depends(get_db)):
+def job_strategy(job_id: int, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Deterministic outreach strategy for a job (who/how-many/tone/sequence).
 
     Uses the job's score against the saved profile when available; falls back
@@ -166,7 +169,7 @@ def job_strategy(job_id: int, db: Session = Depends(get_db)):
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-    profile = matcher.get_demo_profile(db)
+    profile = matcher.get_profile(db, user.id)
     if profile is None:
         return strategy.outreach_strategy(0, job, 0)
 
@@ -177,7 +180,7 @@ def job_strategy(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}")
-def get_job(job_id: int, db: Session = Depends(get_db)):
+def get_job(job_id: int, db: Session = Depends(get_db), _user: User = Depends(require_user)):
     """Return a single job by id."""
     job = db.query(Job).filter(Job.id == job_id).first()
     if job is None:

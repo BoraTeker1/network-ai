@@ -2,208 +2,261 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, Message, RankedMatch, OUTCOMES } from "@/lib/api";
+import { api, Message, OUTCOMES } from "@/lib/api";
 import {
   EmptyState,
   ErrorBanner,
   OutcomeBadge,
   FollowUpBadge,
+  StatusBadge,
   PageHeader,
+  Card,
+  Button,
 } from "@/components/ui";
 
-// Outreach status columns, in funnel order.
-const STATUS_COLUMNS: { status: string; label: string }[] = [
-  { status: "draft", label: "Drafted" },
-  { status: "approved", label: "Approved" },
-  { status: "copied", label: "Copied" },
-  { status: "sent_manually", label: "Sent Manually" },
-  { status: "rejected", label: "Rejected" },
-];
+const chip = "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
 
-function MessageCard({ m }: { m: Message }) {
+function relativeTime(iso: string | null): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}
+
+function channelLabel(m: Message): string {
+  if (m.channel === "linkedin") return "LinkedIn note";
+  if (m.channel === "email") return "Email";
+  return m.message_type.replace(/_/g, " ");
+}
+
+function OutreachCard({
+  m,
+  onUpdated,
+  onError,
+}: {
+  m: Message;
+  onUpdated: (updated: Message) => void;
+  onError: (msg: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function act(fn: () => Promise<Message>) {
+    setBusy(true);
+    try {
+      onUpdated(await fn());
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyDraft() {
+    const text = m.subject ? `Subject: ${m.subject}\n\n${m.draft_text ?? ""}` : m.draft_text ?? "";
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      onError("Clipboard blocked by the browser — open the draft and copy manually.");
+    }
+  }
+
+  const preview = (m.draft_text ?? "").slice(0, 140);
+  const updated = relativeTime(m.updated_at);
+
   return (
-    <Link
-      href={m.job_id ? `/jobs/${m.job_id}` : "/messages"}
-      className="block rounded-md border border-slate-200 bg-white p-2.5 hover:border-blue-400"
-    >
-      <div className="truncate text-sm font-medium text-slate-900">
-        {m.company || "Unknown company"}
+    <Card hover className="p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-base font-semibold leading-tight text-slate-900">
+            {m.title || "Outreach draft"}
+          </div>
+          <div className="mt-0.5 text-sm text-slate-600">
+            <span className="font-medium text-slate-700">{m.company || "Unknown company"}</span>
+            {m.contact_name ? ` · to ${m.contact_name}` : ""}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <StatusBadge status={m.status} />
+            {m.outcome && <OutcomeBadge outcome={m.outcome} />}
+          </div>
+          {updated && <span className="text-xs text-slate-400">Updated {updated}</span>}
+        </div>
       </div>
-      <div className="truncate text-xs text-slate-500">{m.title || ""}</div>
-      <div className="mt-1 flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-slate-400">
-          {m.message_type.replace(/_/g, " ")}
-        </span>
-        {m.outcome && <OutcomeBadge outcome={m.outcome} />}
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className={chip}>{channelLabel(m)}</span>
+        {m.language && <span className={chip}>{m.language === "tr" ? "Türkçe" : "English"}</span>}
+        {m.follow_up_status && (
+          <FollowUpBadge status={m.follow_up_status} dueDate={m.follow_up_due_date} />
+        )}
+        {m.job_url && (
+          <a
+            href={m.job_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Open role ↗
+          </a>
+        )}
       </div>
-      {m.follow_up_status && (
-        <div className="mt-1.5">
-          <FollowUpBadge
-            status={m.follow_up_status}
-            dueDate={m.follow_up_due_date}
-          />
+
+      {/* Draft preview / full view */}
+      {preview && (
+        <div className="mt-2 rounded-md bg-slate-50 px-3 py-2">
+          {open ? (
+            <>
+              {m.subject && (
+                <p className="text-xs font-medium text-slate-700">Subject: {m.subject}</p>
+              )}
+              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{m.draft_text}</p>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {preview}
+              {(m.draft_text ?? "").length > 140 ? "…" : ""}
+            </p>
+          )}
         </div>
       )}
-    </Link>
+
+      {/* Actions — all manual, nothing is ever sent for you */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
+          {open ? "Hide draft" : "View draft"}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={copyDraft}>
+          {copied ? "Copied ✓" : "Copy draft"}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          onClick={() => act(() => api.markSentManually(m.id))}
+        >
+          Mark sent manually
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          onClick={() => act(() => api.setOutcome(m.id, "replied"))}
+        >
+          Mark replied
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          onClick={() => act(() => api.setFollowUp(m.id, "follow_up_needed"))}
+        >
+          Needs follow-up
+        </Button>
+      </div>
+    </Card>
   );
 }
 
 export default function PipelinePage() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [matches, setMatches] = useState<RankedMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [msgs, ranked] = await Promise.all([
-          api.getMessages(),
-          api.getRankedMatches(100),
-        ]);
-        setMessages(msgs);
-        setMatches(ranked);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load pipeline");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    api
+      .getMessages()
+      .then(setMessages)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load pipeline"))
+      .finally(() => setLoading(false));
   }, []);
+
+  function applyUpdate(updated: Message) {
+    setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
+  }
 
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
 
-  const jobsWithDrafts = new Set(
-    messages.map((m) => m.job_id).filter((id): id is number => id != null)
-  );
-  const notStarted = matches.filter((m) => !jobsWithDrafts.has(m.job_id));
-
-  const byStatus = (status: string) =>
-    messages.filter((m) => m.status === status);
-  const byOutcome = (outcome: string) =>
-    messages.filter((m) => m.outcome === outcome);
-
-  const followUpsDue = messages.filter(
-    (m) => m.follow_up_status === "follow_up_needed"
-  );
-
-  const isEmpty = messages.length === 0 && matches.length === 0;
+  const followUpsDue = messages.filter((m) => m.follow_up_status === "follow_up_needed");
+  const byOutcome = (outcome: string) => messages.filter((m) => m.outcome === outcome);
 
   return (
     <div>
       <PageHeader
         title="Networking Pipeline"
-        subtitle="A lightweight CRM for your job-search outreach. Track every contact from an untouched match through drafting, approval, manual send, follow-up, and the real outcome."
+        subtitle="A lightweight CRM for your outreach. Every draft you save from the copilot is tracked here — copy it, mark it sent, log replies, and set follow-ups. Nothing is ever sent for you."
       />
 
       <ErrorBanner message={error} />
 
-      {!isEmpty && (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Follow-ups due ({followUpsDue.length})
-          </div>
-          {followUpsDue.length === 0 ? (
-            <p className="mt-1 text-sm text-amber-700">
-              No follow-up needed yet. Mark one on the Messages page after you
-              reach out.
-            </p>
-          ) : (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {followUpsDue.map((m) => (
-                <Link
-                  key={m.id}
-                  href={m.job_id ? `/jobs/${m.job_id}` : "/messages"}
-                  className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-amber-500"
-                >
-                  {m.company || "Unknown"}
-                  {m.follow_up_due_date ? ` · due ${m.follow_up_due_date}` : ""}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {isEmpty ? (
+      {messages.length === 0 ? (
         <div className="mt-6">
           <EmptyState
-            title="Your pipeline is empty"
-            description="Match jobs and generate outreach drafts to start tracking them here. From the dashboard you can also load demo data instantly."
-            ctaHref="/matches"
-            ctaLabel="Go to matches →"
+            title="No outreach tracked yet"
+            description="Draft a message from an opportunity to start your pipeline."
+            ctaHref="/opportunities"
+            ctaLabel="Browse opportunities →"
           />
         </div>
       ) : (
         <>
-          {/* Outreach status board */}
-          <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-            {/* Not Started — matched jobs with no drafts yet */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-700">
-                  Not Started
-                </span>
-                <span className="text-xs text-slate-400">
-                  {notStarted.length}
-                </span>
-              </div>
-              <div className="mt-2 space-y-2">
-                {notStarted.length === 0 ? (
-                  <p className="text-xs text-slate-400">
-                    Every matched job has drafts.
-                  </p>
-                ) : (
-                  notStarted.slice(0, 8).map((m) => (
-                    <Link
-                      key={m.job_id}
-                      href={`/jobs/${m.job_id}`}
-                      className="block rounded-md border border-slate-200 bg-white p-2.5 hover:border-blue-400"
-                    >
-                      <div className="truncate text-sm font-medium text-slate-900">
-                        {m.company}
-                      </div>
-                      <div className="truncate text-xs text-slate-500">
-                        {m.title}
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
+          {/* Follow-ups due band */}
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+              Follow-ups due ({followUpsDue.length})
             </div>
-
-            {STATUS_COLUMNS.map((col) => {
-              const items = byStatus(col.status);
-              return (
-                <div
-                  key={col.status}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-700">
-                      {col.label}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {items.length}
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {items.length === 0 ? (
-                      <p className="text-xs text-slate-400">—</p>
-                    ) : (
-                      items.map((m) => <MessageCard key={m.id} m={m} />)
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {followUpsDue.length === 0 ? (
+              <p className="mt-1 text-sm text-amber-700">
+                No follow-up needed yet. Mark one on any card after you reach out.
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {followUpsDue.map((m) => (
+                  <span
+                    key={m.id}
+                    className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700"
+                  >
+                    {m.company || "Unknown"}
+                    {m.follow_up_due_date ? ` · due ${m.follow_up_due_date}` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Outcomes band */}
-          <h2 className="mt-10 text-lg font-semibold text-slate-900">
-            Outcomes
-          </h2>
+          {/* Outreach tracker */}
+          <div className="mt-6 space-y-3">
+            {messages.map((m) => (
+              <OutreachCard
+                key={m.id}
+                m={m}
+                onUpdated={applyUpdate}
+                onError={setError}
+              />
+            ))}
+          </div>
+
+          {/* Got a reply? */}
+          <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            Got a reply to one of these?{" "}
+            <Link href="/next-move" className="font-medium text-blue-600 hover:underline">
+              Paste it into Next Move AI →
+            </Link>{" "}
+            to draft your response and log the outcome.
+          </div>
+
+          {/* Outcomes summary */}
+          <h2 className="mt-10 text-lg font-semibold text-slate-900">Outcomes</h2>
           <p className="mt-1 text-sm text-slate-500">
             Real-world results you reported after reaching out manually.
           </p>
@@ -211,31 +264,12 @@ export default function PipelinePage() {
             {OUTCOMES.map((o) => {
               const items = byOutcome(o);
               return (
-                <div
-                  key={o}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
-                >
+                <div key={o} className="rounded-lg border border-slate-200 bg-white p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium capitalize text-slate-600">
                       {o.replace(/_/g, " ")}
                     </span>
-                    <span className="text-sm font-bold text-slate-900">
-                      {items.length}
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    {items.length === 0 ? (
-                      <p className="text-xs text-slate-300">No events yet</p>
-                    ) : (
-                      items.slice(0, 5).map((m) => (
-                        <div
-                          key={m.id}
-                          className="truncate text-xs text-slate-500"
-                        >
-                          {m.company}
-                        </div>
-                      ))
-                    )}
+                    <span className="text-sm font-bold text-slate-900">{items.length}</span>
                   </div>
                 </div>
               );

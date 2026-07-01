@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..deps import require_user
+from ..models import User
 from ..services import events
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/events", tags=["events"])
 @router.get("/recommendations")
 def event_recommendations(
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
     location: str | None = Query(None, description="Override city/area to search near."),
     radius_miles: int = Query(50, ge=1, le=500),
     days_ahead: int = Query(30, ge=1, le=180),
@@ -28,6 +31,7 @@ def event_recommendations(
     """Networking events for the strongest match + always-on manual search links."""
     resp = events.recommend_events(
         db,
+        user.id,
         location=location,
         radius_miles=radius_miles,
         days_ahead=days_ahead,

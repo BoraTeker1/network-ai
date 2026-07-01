@@ -12,16 +12,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DEMO_USER_ID, Contact, EmailDraft, Goal, Job
+from ..deps import require_user
+from ..models import Contact, EmailDraft, Goal, Job, User
 from ..schemas import LinkedInDraftIn
-from ..services import linkedin_generator, matcher
+from ..services import linkedin_generator, matcher, plans
+from ..services.rate_limit import rate_limit
 from .emails import _serialize
 
 router = APIRouter(prefix="/linkedin", tags=["linkedin"])
 
 
 @router.post("/draft")
-def draft_linkedin(payload: LinkedInDraftIn, db: Session = Depends(get_db)):
+def draft_linkedin(
+    payload: LinkedInDraftIn,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("email_draft")),
+    user: User = Depends(plans.enforce_limit("email_draft")),
+):
     """Generate and store a LinkedIn draft (LLM when configured, else template)."""
     if payload.kind not in linkedin_generator.VALID_KINDS:
         raise HTTPException(
@@ -32,18 +39,24 @@ def draft_linkedin(payload: LinkedInDraftIn, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == payload.job_id).first()
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
-    contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
+    contact = (
+        db.query(Contact)
+        .filter(Contact.id == payload.contact_id, Contact.user_id == user.id)
+        .first()
+    )
     if contact is None:
         raise HTTPException(
             status_code=404, detail=f"Contact {payload.contact_id} not found"
         )
     goal = (
-        db.query(Goal).filter(Goal.id == payload.goal_id).first()
+        db.query(Goal)
+        .filter(Goal.id == payload.goal_id, Goal.user_id == user.id)
+        .first()
         if payload.goal_id
         else None
     )
 
-    profile = matcher.get_demo_profile(db)
+    profile = matcher.get_profile(db, user.id)
     skills = matcher._profile_skills(profile) if profile else []
     summary = profile.experience_summary if profile else None
 
@@ -72,7 +85,7 @@ def draft_linkedin(payload: LinkedInDraftIn, db: Session = Depends(get_db)):
     )
 
     draft = EmailDraft(
-        user_id=DEMO_USER_ID,
+        user_id=user.id,
         job_id=job.id,
         contact_id=contact.id,
         goal_id=goal.id if goal else None,

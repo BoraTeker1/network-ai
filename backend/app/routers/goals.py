@@ -1,4 +1,4 @@
-"""Job-search / outreach goal endpoints (single demo user, no auth).
+"""Job-search / outreach goal endpoints (per authenticated user).
 
 A Goal captures what the user is looking for and how they want to reach out.
 It feeds email generation later. CRUD only — nothing here sends anything.
@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import CONTACT_TYPES, DEMO_USER_ID, OUTREACH_GOALS, Goal
+from ..deps import require_user
+from ..models import CONTACT_TYPES, OUTREACH_GOALS, Goal, User
 from ..schemas import GoalIn
 
 router = APIRouter(prefix="/goals", tags=["goals"])
@@ -65,10 +66,10 @@ def _apply(goal: Goal, payload: GoalIn) -> None:
 
 
 @router.get("")
-def list_goals(db: Session = Depends(get_db)):
+def list_goals(db: Session = Depends(get_db), user: User = Depends(require_user)):
     goals = (
         db.query(Goal)
-        .filter(Goal.user_id == DEMO_USER_ID)
+        .filter(Goal.user_id == user.id)
         .order_by(Goal.id.desc())
         .all()
     )
@@ -76,9 +77,9 @@ def list_goals(db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_goal(payload: GoalIn, db: Session = Depends(get_db)):
+def create_goal(payload: GoalIn, db: Session = Depends(get_db), user: User = Depends(require_user)):
     _validate(payload)
-    goal = Goal(user_id=DEMO_USER_ID)
+    goal = Goal(user_id=user.id)
     _apply(goal, payload)
     db.add(goal)
     db.commit()
@@ -87,9 +88,9 @@ def create_goal(payload: GoalIn, db: Session = Depends(get_db)):
 
 
 @router.patch("/{goal_id}")
-def update_goal(goal_id: int, payload: GoalIn, db: Session = Depends(get_db)):
+def update_goal(goal_id: int, payload: GoalIn, db: Session = Depends(get_db), user: User = Depends(require_user)):
     _validate(payload)
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+    goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user.id).first()
     if goal is None:
         raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
     _apply(goal, payload)
@@ -99,8 +100,8 @@ def update_goal(goal_id: int, payload: GoalIn, db: Session = Depends(get_db)):
 
 
 @router.delete("/{goal_id}")
-def delete_goal(goal_id: int, db: Session = Depends(get_db)):
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+def delete_goal(goal_id: int, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user.id).first()
     if goal is None:
         raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
     db.delete(goal)

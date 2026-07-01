@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, Profile } from "@/lib/api";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, PageHeader, WorkflowHint } from "@/components/ui";
 
 export default function ProfilePage() {
   const [resumeText, setResumeText] = useState("");
@@ -75,15 +75,19 @@ export default function ProfilePage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Profile</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Upload a PDF/DOCX or paste resume text. We extract skills and a short
-        summary — no LLM, fully local.
-      </p>
+    <div className="space-y-4">
+      <PageHeader
+        title="Profile"
+        subtitle="Upload a PDF/DOCX or paste resume text. We extract your skills and a short summary locally — no LLM, nothing leaves your machine."
+      />
+
+      <WorkflowHint>
+        Your skills power <strong>role ranking</strong> in Opportunities and personalize every
+        outreach draft.
+      </WorkflowHint>
 
       {/* Option 1: upload a resume file */}
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Option 1 · Upload a resume file
         </div>

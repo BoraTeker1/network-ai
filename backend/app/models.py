@@ -21,8 +21,40 @@ from sqlalchemy.orm import relationship
 
 from .db import Base
 
-# No auth in v1 — every record belongs to this fake user.
+# Legacy single-user id. Rows created before auth landed belong to this id and
+# are invisible to real accounts (scripts/create_user.py --claim-demo-data can
+# reassign them). New rows ALWAYS carry an explicit authenticated user id.
 DEMO_USER_ID = "demo-user"
+
+# Subscription plans. Feature gates live in services/plans.py.
+PLANS = ("free", "pro", "admin")
+
+
+class User(Base):
+    """A real account. Passwords are scrypt-hashed (services/passwords.py) —
+    plaintext is never stored, logged, or returned."""
+
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)   # uuid4 hex
+    email = Column(String, unique=True, index=True, nullable=False)  # lowercased
+    password_hash = Column(String, nullable=False)
+    plan = Column(String, default="free", nullable=False)  # one of PLANS
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthSession(Base):
+    """Opaque server-side session. We store the SHA-256 of the token — a DB
+    leak alone can't be replayed as a cookie."""
+
+    __tablename__ = "auth_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(String, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    revoked = Column(Boolean, default=False)
 
 # Controlled vocabularies for the AI outreach layer (kept here so routers /
 # services share one source of truth).
@@ -92,7 +124,7 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
 
     raw_resume = Column(Text, nullable=True)
     # Simple extracted fields. Lists are stored as JSON-encoded text for now.
@@ -169,7 +201,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
 
     # "connection_request" | "follow_up"
@@ -189,6 +221,22 @@ class Message(Base):
     # plain ISO date string the user picks (kept as text for SQLite simplicity).
     follow_up_status = Column(String, nullable=True, index=True)
     follow_up_due_date = Column(String, nullable=True)
+
+    # ----- Outreach-copilot context (additive; populated by /outreach/save-draft
+    # for Turkey→remote/EU drafts that have NO legacy Job row). Job-linked messages
+    # leave these NULL and fall back to the linked Job's company/title. This is how
+    # the stateless Opportunities→Outreach flow becomes a tracked pipeline item. --
+    company = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    subject = Column(String, nullable=True)
+    channel = Column(String, nullable=True)          # "email" | "linkedin"
+    language = Column(String, nullable=True)          # "en" | "tr"
+    job_url = Column(String, nullable=True)
+    contact_name = Column(String, nullable=True)
+    contact_title = Column(String, nullable=True)
+    opportunity_id = Column(
+        Integer, ForeignKey("opportunities.id"), index=True, nullable=True
+    )
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -221,7 +269,7 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
 
     target_role = Column(String, nullable=True)
     target_location = Column(String, nullable=True)
@@ -243,7 +291,7 @@ class Contact(Base):
     __tablename__ = "contacts"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
 
     name = Column(String, nullable=True)
@@ -275,7 +323,7 @@ class Meeting(Base):
     __tablename__ = "meetings"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
 
     name = Column(String, nullable=False)
@@ -302,7 +350,7 @@ class EmailDraft(Base):
     __tablename__ = "email_drafts"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
     contact_id = Column(Integer, ForeignKey("contacts.id"), index=True, nullable=True)
     goal_id = Column(Integer, ForeignKey("goals.id"), index=True, nullable=True)
@@ -344,7 +392,7 @@ class MomentumEvent(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, default=DEMO_USER_ID)
+    user_id = Column(String, index=True, nullable=False)
 
     # What the event was awarded for, e.g. ("message", 12) or ("email", 3).
     subject_type = Column(String, index=True, nullable=True)
@@ -354,6 +402,48 @@ class MomentumEvent(Base):
     points = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ----- Usage tracking (plan gates) ---------------------------------------------
+
+
+class UsageEvent(Base):
+    """One gated action by one user (e.g. an outreach draft). services/plans.py
+    counts these against the user's plan limits. Content is never stored here."""
+
+    __tablename__ = "usage_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    action = Column(String, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ----- Audit log (production-readiness layer) ---------------------------------
+# Small, append-only record of security-relevant events. NEVER stores resume
+# text, message bodies, passwords, tokens, API keys, or payment details — only
+# event names, an optional user id, an optional client IP, and a short note.
+
+AUDIT_EVENTS = (
+    "signup",
+    "login_success",
+    "login_failed",
+    "logout",
+    "plan_changed",
+    "rate_limited",
+    "upload_rejected",
+)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)   # None for anon events
+    event = Column(String, index=True)                     # one of AUDIT_EVENTS
+    ip = Column(String, nullable=True)
+    note = Column(Text, nullable=True)                     # short, non-sensitive
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 # ----- Curated Turkey + Remote/EU opportunity feed (additive, isolated table) --

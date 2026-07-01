@@ -8,24 +8,34 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import OUTCOMES, Job, JobMatch, Message
+from ..deps import require_user
+from ..models import OUTCOMES, Job, JobMatch, Message, User
 from ..services import matcher
-from .messages import VALID_STATUSES, _demo_skills, _serialize
+from .messages import VALID_STATUSES, _serialize, _user_skills
 
 router = APIRouter(tags=["insights"])
 
 
 @router.get("/stats")
-def dashboard_stats(db: Session = Depends(get_db)):
+def dashboard_stats(db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Everything the homepage dashboard needs in a single call."""
-    skills = _demo_skills(db)
+    skills = _user_skills(db, user.id)
 
     total_jobs = db.query(Job).count()
-    total_matches = db.query(JobMatch).count()
+    profile = matcher.get_profile(db, user.id)
+    match_q = db.query(JobMatch).filter(
+        JobMatch.profile_id == (profile.id if profile else -1)
+    )
+    total_matches = match_q.count()
     # Strong targets are the high-confidence matches (score >= 75) the funnel
     # and dashboard headline both key off of.
-    strong_targets = db.query(JobMatch).filter(JobMatch.score >= 75).count()
-    messages = db.query(Message).order_by(Message.id.desc()).all()
+    strong_targets = match_q.filter(JobMatch.score >= 75).count()
+    messages = (
+        db.query(Message)
+        .filter(Message.user_id == user.id)
+        .order_by(Message.id.desc())
+        .all()
+    )
 
     status_counts = {status: 0 for status in VALID_STATUSES}
     outcome_counts = {outcome: 0 for outcome in OUTCOMES}
@@ -49,7 +59,7 @@ def dashboard_stats(db: Session = Depends(get_db)):
         {"label": "Interviews", "value": outcome_counts.get("interview_received", 0)},
     ]
 
-    top_matches = matcher.ranked_matches(db, limit=5)
+    top_matches = matcher.ranked_matches(db, user.id, limit=5)
     recent_messages = [_serialize(msg, skills) for msg in messages[:5]]
 
     return {
@@ -67,12 +77,12 @@ def dashboard_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/outcomes")
-def list_outcomes(db: Session = Depends(get_db)):
+def list_outcomes(db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Supported outcome vocabulary, per-outcome counts, and reported messages."""
-    skills = _demo_skills(db)
+    skills = _user_skills(db, user.id)
     msgs = (
         db.query(Message)
-        .filter(Message.outcome.isnot(None))
+        .filter(Message.user_id == user.id, Message.outcome.isnot(None))
         .order_by(Message.id.desc())
         .all()
     )

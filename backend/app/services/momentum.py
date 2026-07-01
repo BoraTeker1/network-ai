@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from ..models import DEMO_USER_ID, MomentumEvent
+from ..models import MomentumEvent
 
 # Points per event type. Kept deliberately weighted toward real outcomes
 # (replies, referrals, interviews) over mechanical workflow steps.
@@ -92,15 +92,17 @@ def _serialize_award(ev: MomentumEvent) -> dict:
     }
 
 
-def award(db: Session, subject_type: str, subject_id: int | None, event_type: str | None):
-    """Award a momentum event once. Returns the award dict, or None if the event
-    type is unknown or this exact event was already awarded (no double-count)."""
+def award(db: Session, user_id: str, subject_type: str, subject_id: int | None,
+          event_type: str | None):
+    """Award a momentum event once for this user. Returns the award dict, or
+    None if the event type is unknown or already awarded (no double-count)."""
     if not event_type or event_type not in POINTS:
         return None
 
     existing = (
         db.query(MomentumEvent)
         .filter(
+            MomentumEvent.user_id == user_id,
             MomentumEvent.subject_type == subject_type,
             MomentumEvent.subject_id == subject_id,
             MomentumEvent.event_type == event_type,
@@ -111,7 +113,7 @@ def award(db: Session, subject_type: str, subject_id: int | None, event_type: st
         return None  # already counted — clicking again never re-awards
 
     ev = MomentumEvent(
-        user_id=DEMO_USER_ID,
+        user_id=user_id,
         subject_type=subject_type,
         subject_id=subject_id,
         event_type=event_type,
@@ -123,11 +125,11 @@ def award(db: Session, subject_type: str, subject_id: int | None, event_type: st
     return _serialize_award(ev)
 
 
-def summary(db: Session) -> dict:
+def summary(db: Session, user_id: str) -> dict:
     """Dashboard summary: points today, total, streak, and recent wins."""
     events = (
         db.query(MomentumEvent)
-        .filter(MomentumEvent.user_id == DEMO_USER_ID)
+        .filter(MomentumEvent.user_id == user_id)
         .order_by(MomentumEvent.id.desc())
         .all()
     )

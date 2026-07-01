@@ -9,7 +9,7 @@ from datetime import date
 
 import pytest
 
-from app.models import DEMO_USER_ID, Job, Meeting, MomentumEvent
+from app.models import Job, Meeting, MomentumEvent
 
 
 @pytest.fixture

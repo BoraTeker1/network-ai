@@ -9,15 +9,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Contact, EmailDraft, Job, Message
+from ..deps import require_user
+from ..models import Contact, EmailDraft, Job, Message, User
 from ..schemas import NextMoveIn
-from ..services import next_move
+from ..services import next_move, plans
+from ..services.rate_limit import rate_limit
 
 router = APIRouter(prefix="/next-move", tags=["next-move"])
 
 
 @router.post("/analyze")
-def analyze(payload: NextMoveIn, db: Session = Depends(get_db)):
+def analyze(
+    payload: NextMoveIn,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("next_move")),
+    user: User = Depends(plans.enforce_limit("next_move")),
+):
     """Analyze a pasted reply and return summary, intent, next move, and drafts."""
     reply_text = (payload.reply_text or "").strip()
     if not reply_text:
@@ -28,14 +35,22 @@ def analyze(payload: NextMoveIn, db: Session = Depends(get_db)):
 
     # Resolve a linked pipeline item for context + as the update target.
     if payload.message_id is not None:
-        msg = db.query(Message).filter(Message.id == payload.message_id).first()
+        msg = (
+            db.query(Message)
+            .filter(Message.id == payload.message_id, Message.user_id == user.id)
+            .first()
+        )
         if msg is None:
             raise HTTPException(status_code=404, detail="Linked message not found")
         pipeline_target = {"type": "message", "id": msg.id}
         if msg.job:
             company, role = msg.job.company, msg.job.title
     elif payload.email_id is not None:
-        email = db.query(EmailDraft).filter(EmailDraft.id == payload.email_id).first()
+        email = (
+            db.query(EmailDraft)
+            .filter(EmailDraft.id == payload.email_id, EmailDraft.user_id == user.id)
+            .first()
+        )
         if email is None:
             raise HTTPException(status_code=404, detail="Linked email not found")
         pipeline_target = {"type": "email", "id": email.id}
@@ -50,7 +65,11 @@ def analyze(payload: NextMoveIn, db: Session = Depends(get_db)):
         if job is not None:
             company, role = job.company, job.title
     if contact_name is None and payload.contact_id is not None:
-        contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
+        contact = (
+            db.query(Contact)
+            .filter(Contact.id == payload.contact_id, Contact.user_id == user.id)
+            .first()
+        )
         if contact is not None:
             contact_name, contact_title = contact.name, contact.title
 

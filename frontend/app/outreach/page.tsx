@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, OutreachDraft, Checklist, ContactGuidance } from "@/lib/api";
+import Link from "next/link";
+import { api, ApiError, OutreachDraft, Checklist, ContactGuidance } from "@/lib/api";
 import {
   PageHeader,
   ErrorBanner,
   QualityChecklist,
   SectionLabel,
-  WhyNotSpam,
+  TrustLine,
 } from "@/components/ui";
+import UpgradeCallout from "@/components/UpgradeCallout";
 
 type Language = "en" | "tr";
 type Channel = "email" | "linkedin";
@@ -106,6 +108,13 @@ export default function OutreachPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
+  // Preserved opportunity context (set when arriving from the feed) so a saved
+  // pipeline item links back to its source opportunity + apply URL.
+  const [opportunityId, setOpportunityId] = useState<number | null>(null);
+  const [jobUrl, setJobUrl] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+
   // "Who to contact" guidance, loaded up-front so the user finds a real person
   // BEFORE drafting (then pastes the name above and drafts to them).
   const [guidance, setGuidance] = useState<ContactGuidance | null>(null);
@@ -114,7 +123,16 @@ export default function OutreachPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planLimit, setPlanLimit] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  function handleApiError(e: unknown, fallback: string) {
+    if (e instanceof ApiError && e.code === "plan_limit") {
+      setPlanLimit(e.message);
+      return;
+    }
+    setError(e instanceof Error ? e.message : fallback);
+  }
 
   // Prefill from an opportunity the user clicked "Draft outreach" on.
   useEffect(() => {
@@ -123,6 +141,8 @@ export default function OutreachPage() {
     try {
       const p = JSON.parse(raw);
       if (p.jd_text) setJdText(p.jd_text);
+      if (typeof p.id === "number") setOpportunityId(p.id);
+      if (p.url) setJobUrl(p.url);
       const lang: Language = p.language === "tr" ? "tr" : "en";
       if (p.company) {
         setCompany(p.company);
@@ -200,10 +220,38 @@ export default function OutreachPage() {
       setDraft(result);
       setSubject(result.subject);
       setBody(result.body);
+      setSavedId(null); // a fresh draft hasn't been saved yet
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to draft outreach.");
+      handleApiError(e, "Failed to draft outreach.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveToPipeline() {
+    if (!draft || !body.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await api.saveOutreachToPipeline({
+        body,
+        subject: draft.channel === "email" ? subject : null,
+        company: company || draft.detected_company || null,
+        role: role || draft.detected_role || null,
+        channel: draft.channel,
+        language: draft.language,
+        opportunity_id: opportunityId,
+        job_url: jobUrl || null,
+        contact_name: name || null,
+        contact_title: title || null,
+        status: "copied",
+      });
+      setSavedId(saved.id);
+      setNotice("Saved to your pipeline — track it there.");
+    } catch (e) {
+      handleApiError(e, "Couldn't save to pipeline.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -221,10 +269,12 @@ export default function OutreachPage() {
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
       <PageHeader
         title="Outreach copilot"
-        subtitle="For Turkish engineers targeting Turkey, remote, European, or global roles. Paste a job you found (or start one from Opportunities), find the right people to contact in two clicks, then get an honest, low-pressure draft in English or Turkish — personalized with your saved profile skills. You review, edit, copy, and send it yourself."
+        subtitle="For Turkish engineers targeting Turkey, remote, European, or global roles. Paste a job you found (or start one from Opportunities), find the right people to contact in two clicks, then get an honest, low-pressure draft in English or Turkish — personalized with your saved profile skills."
       />
 
-      <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+      <TrustLine />
+
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
           <label className="text-sm font-medium text-slate-700">
             Job description (paste it yourself — no scraping)
@@ -370,12 +420,13 @@ export default function OutreachPage() {
         </div>
 
         <ErrorBanner message={error} />
+        {planLimit && <UpgradeCallout message={planLimit} />}
       </div>
 
       {draft && (
         <>
           {/* 1. Draft message */}
-          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{LANG_LABEL[draft.language]}</span>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{CHANNEL_LABEL[draft.channel]}</span>
@@ -409,7 +460,23 @@ export default function OutreachPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button onClick={copy} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
+              {savedId ? (
+                <Link
+                  href="/pipeline"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Saved ✓ · View in pipeline →
+                </Link>
+              ) : (
+                <button
+                  onClick={saveToPipeline}
+                  disabled={saving}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save to pipeline"}
+                </button>
+              )}
+              <button onClick={copy} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50">
                 Copy message
               </button>
               {notice && <span className="text-sm text-green-700">{notice}</span>}
@@ -433,8 +500,6 @@ export default function OutreachPage() {
           </div>
         </>
       )}
-
-      <WhyNotSpam />
     </div>
   );
 }

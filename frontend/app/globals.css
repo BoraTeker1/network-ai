@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Professional system font stack — no web-font fetch, so builds stay offline-safe. */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Calmer, more intentional focus ring than the default browser outline. */
+@layer base {
+  :focus-visible {
+    @apply outline-none ring-2 ring-blue-500/60 ring-offset-1 ring-offset-white;
+  }
 }

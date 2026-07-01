@@ -8,7 +8,15 @@ import {
   OpportunityFilters,
   OpportunitySource,
 } from "@/lib/api";
-import { PageHeader, ErrorBanner, EmptyState, SectionLabel } from "@/components/ui";
+import {
+  PageHeader,
+  ErrorBanner,
+  EmptyState,
+  SectionLabel,
+  Card,
+  Button,
+  WorkflowHint,
+} from "@/components/ui";
 
 const REGIONS = ["", "turkey", "remote", "europe", "global"];
 const REGION_LABEL: Record<string, string> = {
@@ -119,22 +127,21 @@ export default function OpportunitiesPage() {
         title="Opportunities for Turkish junior engineers"
         subtitle="Turkey-based, remote, European, and global roles a Turkey-based junior can realistically apply to — each flows into the bilingual outreach copilot."
         action={
-          <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button onClick={refresh} disabled={refreshing}>
             {refreshing ? "Refreshing…" : "Refresh live sources"}
-          </button>
+          </Button>
         }
       />
 
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        Sources are <strong>companies&apos; official public ATS APIs</strong> (Lever/Greenhouse/Ashby),
-        public job APIs, a labelled sample seed, and manual import — <strong>no scraping</strong> of
-        Kariyer.net, LinkedIn, or any protected site. Eligibility labels are{" "}
-        <strong>conservative guesses</strong>; always verify on the company page before applying.
-      </div>
+      <WorkflowHint>
+        Pick a realistic role → <strong>draft outreach</strong> → save it to your pipeline.
+      </WorkflowHint>
+
+      <p className="text-xs text-slate-500">
+        Sourced from companies&apos; official public ATS APIs, public job feeds &amp; manual
+        import — <strong>no scraping</strong>. Eligibility labels are conservative guesses;
+        always verify on the company page before applying.
+      </p>
 
       {/* Source registry status */}
       <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
@@ -225,20 +232,21 @@ export default function OpportunitiesPage() {
       ) : (
         <div className="space-y-3">
           {items.map((opp) => (
-            <div key={opp.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <Card key={opp.id} hover className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-900">{opp.title}</div>
-                  <div className="text-sm text-slate-600">
-                    {opp.company}{opp.location ? ` · ${opp.location}` : ""}
+                  <div className="text-base font-semibold leading-tight text-slate-900">{opp.title}</div>
+                  <div className="mt-0.5 text-sm text-slate-600">
+                    <span className="font-medium text-slate-700">{opp.company}</span>
+                    {opp.location ? ` · ${opp.location}` : ""}
                   </div>
                 </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${applicabilityStyle(opp.turkey_applicability_label)}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${applicabilityStyle(opp.turkey_applicability_label)}`}>
                   {opp.turkey_applicability_label}
                 </span>
               </div>
 
-              <p className="mt-1 text-xs text-slate-500">{opp.turkey_applicability_reason}</p>
+              <p className="mt-1.5 text-xs text-slate-500">{opp.turkey_applicability_reason}</p>
 
               {opp.match.reason && (
                 <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-1.5">
@@ -277,23 +285,21 @@ export default function OpportunitiesPage() {
                 </p>
               )}
 
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button onClick={() => draftOutreach(opp)} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
-                  Draft outreach
-                </button>
+              <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-3">
+                <Button onClick={() => draftOutreach(opp)}>Draft outreach</Button>
                 {opp.is_sample ? (
-                  <span className="text-sm text-slate-400">
+                  <span className="text-xs text-slate-400">
                     Sample listing — refresh live sources for real links
                   </span>
                 ) : (
                   opp.url && (
-                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">
                       Open application ↗
                     </a>
                   )
                 )}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

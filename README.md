@@ -110,6 +110,25 @@ features degrade gracefully when blank.
 | `PDL_API_KEY` | Optional compliant discovery provider | _(blank → off)_ |
 | `GMAIL_SEND_ENABLED` | Must be `true` to even consider sending | `false` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Future Gmail OAuth | _(blank)_ |
+| `ALLOWED_ORIGINS` | CORS origins, comma-separated (never `*`) | `http://localhost:3000` |
+| `COOKIE_SECURE` | `true` in production (HTTPS-only session cookie) | `false` |
+| `SESSION_TTL_DAYS` | Session lifetime | `30` |
+| `TRUST_PROXY` | Honor `X-Forwarded-For` (only behind your proxy) | `false` |
+| `RATE_LIMIT_*` / `RATE_LIMIT_DISABLED` | Per-action req/min limits (see `.env.example`) | sensible defaults |
+| `PLAN_LIMIT_FREE_*` | Free-plan gate limits (see `.env.example`) | sensible defaults |
+
+### Accounts, plans & privacy (beta)
+
+The app now has real **email+password accounts** (scrypt-hashed, HttpOnly
+session cookies). Each user's profile, drafts, pipeline, contacts, and momentum
+are **private to their account**; the opportunity feed and pricing page are
+public. Free accounts have daily gate limits (drafts, Next Move analyses,
+pipeline items); **Pro** removes them. Payments are **not live** in the beta —
+checkout says so honestly, and plans are changed only by an audited admin
+action (`POST /billing/set-plan` or `backend/scripts/create_user.py`).
+See **`PRODUCTION_CHECKLIST.md`** for what must be configured before deploying
+and what is deliberately deferred (Stripe, email verification, password reset,
+Postgres, CSP).
 
 > The backend reads `.env` via `python-dotenv` and **never** writes or logs it.
 > Secrets stay server-side; the frontend never sees an API key.

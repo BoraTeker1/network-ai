@@ -1,8 +1,124 @@
 // Small shared UI primitives used across pages — kept deliberately tiny.
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { Checklist } from "@/lib/api";
+
+/** Standard surface card — soft border + subtle shadow for a calm SaaS feel. */
+export function Card({
+  children,
+  className = "",
+  hover = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  hover?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-slate-200 bg-white shadow-sm ${
+        hover ? "transition-colors hover:border-slate-300 hover:shadow-md" : ""
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
+  primary: "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50",
+  secondary:
+    "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50",
+  ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50",
+  danger: "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-50",
+};
+
+/** Consistent button. `size="sm"` for inline card actions. */
+export function Button({
+  variant = "primary",
+  size = "md",
+  className = "",
+  ...props
+}: {
+  variant?: ButtonVariant;
+  size?: "sm" | "md";
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const sizing = size === "sm" ? "px-2.5 py-1 text-xs" : "px-4 py-2 text-sm";
+  return (
+    <button
+      {...props}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${sizing} ${BUTTON_VARIANTS[variant]} ${className}`}
+    />
+  );
+}
+
+type PillTone = "neutral" | "blue" | "green" | "amber" | "rose" | "violet";
+const PILL_TONES: Record<PillTone, string> = {
+  neutral: "bg-slate-100 text-slate-600",
+  blue: "bg-blue-50 text-blue-700",
+  green: "bg-green-100 text-green-800",
+  amber: "bg-amber-100 text-amber-800",
+  rose: "bg-rose-100 text-rose-700",
+  violet: "bg-violet-100 text-violet-800",
+};
+
+/** Generic rounded pill/badge for chips and labels. */
+export function Pill({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: PillTone;
+}) {
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PILL_TONES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Small section header used to group content within a page. */
+export function SectionHeader({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      {hint && <span className="text-xs text-slate-500">{hint}</span>}
+      {action}
+    </div>
+  );
+}
+
+/** Slim, one-line hint that makes the core loop obvious at the top of a page. */
+export function WorkflowHint({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm text-blue-900">
+      <span aria-hidden className="text-blue-500">
+        →
+      </span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/** Compact one-line trust note — the anti-spam promise without dominating a page. */
+export function TrustLine() {
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-slate-500">
+      <span className="text-green-600">🛡️</span>
+      Copilot, not autopilot — nothing is scraped, auto-sent, or sent in bulk. You review,
+      copy, and send everything yourself.
+    </p>
+  );
+}
 
 /** Friendly empty state with an optional call-to-action. */
 export function EmptyState({

@@ -69,7 +69,7 @@ export default function EventsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Networking events"
-        subtitle="Where can I meet people connected to my strongest job opportunity this week or month? Real events come from configured providers — we never invent events, and always fall back to safe manual searches."
+        subtitle="Meet people connected to your strongest opportunities — in Türkiye or globally. Events come from configured providers and safe manual searches; we never invent events or scrape."
         action={
           <Link
             href="/dashboard"

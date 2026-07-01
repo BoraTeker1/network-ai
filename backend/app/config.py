@@ -93,6 +93,33 @@ def get_meetup_api_key() -> str:
     return _get("MEETUP_API_KEY")
 
 
+# ----- Deployment / security (production-readiness layer) -----
+
+def get_allowed_origins() -> list[str]:
+    """CORS origins, comma-separated via ALLOWED_ORIGINS. Never a wildcard —
+    credentialed CORS requires an explicit list."""
+    raw = _get("ALLOWED_ORIGINS", "http://localhost:3000")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+def cookie_secure() -> bool:
+    """Set COOKIE_SECURE=true in production (HTTPS). Default false so local dev
+    and tests (http://testserver) keep working."""
+    return _get("COOKIE_SECURE", "false").lower() in ("1", "true", "yes", "on")
+
+
+def trust_proxy() -> bool:
+    """Only honor X-Forwarded-For when explicitly behind a trusted proxy."""
+    return _get("TRUST_PROXY", "false").lower() in ("1", "true", "yes", "on")
+
+
+def session_ttl_days() -> int:
+    try:
+        return max(1, int(_get("SESSION_TTL_DAYS", "30")))
+    except ValueError:
+        return 30
+
+
 # ----- Gmail (disabled by default) -----
 
 def gmail_send_enabled() -> bool:

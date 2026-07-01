@@ -241,12 +241,28 @@ export type OutreachPasteInput = {
 // ----- Curated Turkey + Remote/EU opportunity feed -----
 
 export type OutreachPrefill = {
+  id?: number;
   company: string;
   role: string;
   jd_text: string;
+  url?: string;
   target_region: "turkey" | "europe" | "remote" | "global";
   language: "en" | "tr";
   include_location_line: boolean;
+};
+
+export type OutreachSaveInput = {
+  body: string;
+  subject?: string | null;
+  company?: string | null;
+  role?: string | null;
+  channel: "email" | "linkedin";
+  language: "en" | "tr";
+  opportunity_id?: number | null;
+  job_url?: string | null;
+  contact_name?: string | null;
+  contact_title?: string | null;
+  status?: string;
 };
 
 export type OpportunityMatch = {
@@ -349,8 +365,15 @@ export type RefreshAllResult = {
 export type Message = {
   id: number;
   job_id: number | null;
+  opportunity_id: number | null;
   company: string | null;
   title: string | null;
+  subject: string | null;
+  channel: string | null;
+  language: string | null;
+  job_url: string | null;
+  contact_name: string | null;
+  contact_title: string | null;
   message_type: string;
   tone: string;
   draft_text: string | null;
@@ -741,28 +764,108 @@ export type IngestResult = {
   source: string;
 };
 
+/** Typed API error: `status` for auth handling (401 → login), `code` for
+ * structured errors like plan limits ("plan_limit" → upgrade callout). */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  detail: unknown;
+
+  constructor(status: number, message: string, detail?: unknown, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    this.code = code;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
+    credentials: "include", // send/receive the na_session cookie
     ...options,
   });
   if (!res.ok) {
-    let detail = `Request failed (${res.status})`;
+    let message = `Request failed (${res.status})`;
+    let detail: unknown;
+    let code: string | undefined;
     try {
       const body = await res.json();
-      if (body?.detail) detail = body.detail;
+      detail = body?.detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (detail && typeof detail === "object") {
+        const d = detail as { message?: string; code?: string };
+        if (d.message) message = d.message;
+        if (d.code) code = d.code;
+      }
     } catch {
       /* ignore non-JSON error bodies */
     }
-    throw new Error(detail);
+    throw new ApiError(res.status, message, detail, code);
   }
   // Some endpoints may return empty bodies; guard against that.
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
 }
 
+// ----- Auth / billing types -----
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+  plan: "free" | "pro" | "admin";
+  created_at: string | null;
+};
+
+export type BillingOverview = {
+  plan: string;
+  limits: Record<string, number | null>;
+  usage: Record<string, number>;
+};
+
+export type PricingPlan = {
+  id: string;
+  name: string;
+  price_monthly_usd: number;
+  features: string[];
+};
+
 export const api = {
+  // Auth (session cookie is HttpOnly; JS never sees the token)
+  signup: (email: string, password: string) =>
+    request<CurrentUser>("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  login: (email: string, password: string) =>
+    request<CurrentUser>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => request<{ status: string }>("/auth/logout", { method: "POST" }),
+  // null = not logged in (a 401 here is a normal state, not an error).
+  me: async (): Promise<CurrentUser | null> => {
+    try {
+      return await request<CurrentUser>("/auth/me");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return null;
+      throw e;
+    }
+  },
+
+  // Billing / plans
+  getBillingPlan: () => request<BillingOverview>("/billing/plan"),
+  getBillingPlans: () =>
+    request<{ plans: PricingPlan[]; beta: boolean }>("/billing/plans"),
+  checkout: () =>
+    request<{ status: string; message: string; plan: string }>(
+      "/billing/checkout",
+      { method: "POST" },
+    ),
+
   // Profile
   getProfile: () => request<Profile>("/profile"),
   saveProfile: (resume_text: string) =>
@@ -903,6 +1006,12 @@ export const api = {
   // Paste-a-JD bilingual outreach (paste a JD you found yourself; draft TR/EN)
   draftOutreachFromPaste: (input: OutreachPasteInput) =>
     request<OutreachDraft>("/outreach/draft-from-paste", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  // Save a reviewed outreach draft as a tracked pipeline item (never sends).
+  saveOutreachToPipeline: (input: OutreachSaveInput) =>
+    request<Message>("/outreach/save-draft", {
       method: "POST",
       body: JSON.stringify(input),
     }),

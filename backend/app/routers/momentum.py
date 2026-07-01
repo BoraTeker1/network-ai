@@ -9,12 +9,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..deps import require_user
+from ..models import User
 from ..services import momentum
 
 router = APIRouter(prefix="/momentum", tags=["momentum"])
 
 
 @router.get("/summary")
-def momentum_summary(db: Session = Depends(get_db)):
+def momentum_summary(db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Points earned today, total points, current streak, and recent wins."""
-    return momentum.summary(db)
+    return momentum.summary(db, user.id)

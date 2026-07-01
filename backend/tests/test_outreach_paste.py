@@ -207,11 +207,16 @@ def test_endpoint_uses_saved_profile_skills(client, monkeypatch):
 
 
 def test_no_auto_send_routes(client):
-    # The outreach surface is draft + read-only contact guidance — never a send.
+    # The outreach surface is draft + read-only contact guidance + save-to-pipeline
+    # (which only persists a reviewed draft) — never a send.
     outreach_paths = {
         r.path for r in client.app.routes if getattr(r, "path", "").startswith("/outreach")
     }
-    assert outreach_paths == {"/outreach/draft-from-paste", "/outreach/contact-guidance"}
+    assert outreach_paths == {
+        "/outreach/draft-from-paste",
+        "/outreach/contact-guidance",
+        "/outreach/save-draft",
+    }
     assert not any("send" in p for p in outreach_paths)
 
 

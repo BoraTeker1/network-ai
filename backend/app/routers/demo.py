@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DEMO_USER_ID, Job, Message, Profile
+from ..deps import require_user
+from ..models import Job, Message, Profile, User
 from ..services import matcher, message_generator
 from ..services.resume_parser import parse_resume
 
@@ -50,14 +51,14 @@ def _seed_external_id(company: str, title: str) -> str:
 
 
 @router.post("/seed")
-def seed_demo(db: Session = Depends(get_db)):
+def seed_demo(db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Seed a demo profile, jobs, matches, and drafts. Safe to run repeatedly."""
     actions: list[str] = []
 
-    # 1. Profile (upsert the single demo user).
-    profile = db.query(Profile).filter(Profile.user_id == DEMO_USER_ID).first()
+    # 1. Profile (upsert the current user's profile).
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     if profile is None:
-        profile = Profile(user_id=DEMO_USER_ID)
+        profile = Profile(user_id=user.id)
         db.add(profile)
         actions.append("created demo profile")
     else:
@@ -96,14 +97,14 @@ def seed_demo(db: Session = Depends(get_db)):
     actions.append(f"added {jobs_added} demo jobs")
 
     # 3. Rank everything against the profile.
-    matcher.match_all(db)
+    matcher.match_all(db, user.id)
     actions.append("ranked all jobs")
 
     # 4. Generate drafts for the top demo jobs (only if none exist yet).
     drafts_created = 0
-    if db.query(Message).count() == 0:
+    if db.query(Message).filter(Message.user_id == user.id).count() == 0:
         skills = json.loads(profile.skills) if profile.skills else []
-        top = matcher.ranked_matches(db, limit=2)
+        top = matcher.ranked_matches(db, user.id, limit=2)
         for match in top:
             job = db.query(Job).filter(Job.id == match["job_id"]).first()
             if job is None:
@@ -115,7 +116,7 @@ def seed_demo(db: Session = Depends(get_db)):
             ):
                 db.add(
                     Message(
-                        user_id=DEMO_USER_ID,
+                        user_id=user.id,
                         job_id=job.id,
                         message_type=mtype,
                         content=text,
@@ -130,5 +131,5 @@ def seed_demo(db: Session = Depends(get_db)):
         "ok": True,
         "actions": actions,
         "total_jobs": db.query(Job).count(),
-        "total_messages": db.query(Message).count(),
+        "total_messages": db.query(Message).filter(Message.user_id == user.id).count(),
     }

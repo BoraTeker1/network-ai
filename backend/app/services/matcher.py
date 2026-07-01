@@ -22,7 +22,7 @@ import re
 
 from sqlalchemy.orm import Session
 
-from ..models import DEMO_USER_ID, Job, JobMatch, Profile
+from ..models import Job, JobMatch, Profile
 from . import strategy
 
 # --- Role-title tiers (most specific wins) ---
@@ -125,9 +125,9 @@ def _token_pattern(term: str) -> re.Pattern:
     return re.compile(rf"(?<![a-z0-9]){re.escape(term.lower())}(?![a-z0-9])", re.IGNORECASE)
 
 
-def get_demo_profile(db: Session) -> Profile | None:
-    """Return the single demo-user profile, or None if not saved yet."""
-    return db.query(Profile).filter(Profile.user_id == DEMO_USER_ID).first()
+def get_profile(db: Session, user_id: str) -> Profile | None:
+    """Return the given user's profile, or None if not saved yet."""
+    return db.query(Profile).filter(Profile.user_id == user_id).first()
 
 
 def _profile_skills(profile: Profile) -> list[str]:
@@ -295,9 +295,9 @@ def _upsert_match(db: Session, profile: Profile, job: Job, result: dict) -> JobM
     return match
 
 
-def match_job(db: Session, job_id: int) -> dict:
-    """Score a single job against the demo profile and upsert the match."""
-    profile = get_demo_profile(db)
+def match_job(db: Session, job_id: int, user_id: str) -> dict:
+    """Score a single job against the user's profile and upsert the match."""
+    profile = get_profile(db, user_id)
     if profile is None:
         raise ValueError("No profile saved yet — paste a resume first.")
 
@@ -325,9 +325,9 @@ def match_job(db: Session, job_id: int) -> dict:
     }
 
 
-def match_all(db: Session) -> dict:
-    """Score every stored job against the demo profile."""
-    profile = get_demo_profile(db)
+def match_all(db: Session, user_id: str) -> dict:
+    """Score every stored job against the user's profile."""
+    profile = get_profile(db, user_id)
     if profile is None:
         raise ValueError("No profile saved yet — paste a resume first.")
 
@@ -341,9 +341,9 @@ def match_all(db: Session) -> dict:
     return {"profile_id": profile.id, "matched_jobs": len(jobs)}
 
 
-def ranked_matches(db: Session, limit: int = 100) -> list[dict]:
-    """Return jobs joined with their match scores, highest score first."""
-    profile = get_demo_profile(db)
+def ranked_matches(db: Session, user_id: str, limit: int = 100) -> list[dict]:
+    """Return the user's jobs+match scores, highest score first."""
+    profile = get_profile(db, user_id)
     if profile is None:
         return []
 

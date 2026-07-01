@@ -20,7 +20,6 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     CONTACT_TYPES,
-    DEMO_USER_ID,
     Contact,
     EmailDraft,
     Goal,
@@ -87,9 +86,9 @@ def _recommended_contact_types(label: str, goal: Goal | None, company: str | Non
     ]
 
 
-def _best_match(db: Session) -> tuple[dict | None, Job | None]:
-    """Highest-ranked match for the demo profile (reuses the matcher)."""
-    ranked = matcher.ranked_matches(db, limit=1)
+def _best_match(db: Session, user_id: str) -> tuple[dict | None, Job | None]:
+    """Highest-ranked match for the user's profile (reuses the matcher)."""
+    ranked = matcher.ranked_matches(db, user_id, limit=1)
     if not ranked:
         return None, None
     best = ranked[0]
@@ -97,15 +96,15 @@ def _best_match(db: Session) -> tuple[dict | None, Job | None]:
     return best, job
 
 
-def _drafts_summary(db: Session) -> dict:
+def _drafts_summary(db: Session, user_id: str) -> dict:
     """Counts of drafts awaiting the user across both workflows.
 
     `pending_review` is the headline number: drafts still sitting at status
     'draft' that the user should approve or reject. `ready_to_send` are approved
     drafts the user has not yet copied / marked sent.
     """
-    messages = db.query(Message).filter(Message.user_id == DEMO_USER_ID).all()
-    emails = db.query(EmailDraft).filter(EmailDraft.user_id == DEMO_USER_ID).all()
+    messages = db.query(Message).filter(Message.user_id == user_id).all()
+    emails = db.query(EmailDraft).filter(EmailDraft.user_id == user_id).all()
 
     message_drafts = sum(1 for m in messages if m.status == "draft")
     email_drafts = sum(1 for e in emails if e.status == "draft")
@@ -120,12 +119,12 @@ def _drafts_summary(db: Session) -> dict:
     }
 
 
-def _follow_ups_summary(db: Session) -> dict:
+def _follow_ups_summary(db: Session, user_id: str) -> dict:
     """Follow-ups the user has flagged as needed across both workflows."""
     msg_due = (
         db.query(Message)
         .filter(
-            Message.user_id == DEMO_USER_ID,
+            Message.user_id == user_id,
             Message.follow_up_status == "follow_up_needed",
         )
         .all()
@@ -133,7 +132,7 @@ def _follow_ups_summary(db: Session) -> dict:
     email_due = (
         db.query(EmailDraft)
         .filter(
-            EmailDraft.user_id == DEMO_USER_ID,
+            EmailDraft.user_id == user_id,
             EmailDraft.follow_up_status == "follow_up_needed",
         )
         .all()
@@ -160,15 +159,19 @@ def _follow_ups_summary(db: Session) -> dict:
     return {"due": len(items), "items": items[:8]}
 
 
-def _pipeline_summary(db: Session) -> dict:
+def _pipeline_summary(db: Session, user_id: str) -> dict:
     """A funnel over local data (messages + emails). Mirrors the /stats funnel
     but spans both outreach workflows. Deterministic counts, no estimates."""
     total_jobs = db.query(Job).count()
-    strong_matches = db.query(JobMatch).filter(JobMatch.score >= strategy.STRONG_MIN).count()
-    people_met = db.query(Meeting).filter(Meeting.user_id == DEMO_USER_ID).count()
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    strong_q = db.query(JobMatch).filter(JobMatch.score >= strategy.STRONG_MIN)
+    strong_matches = (
+        strong_q.filter(JobMatch.profile_id == profile.id).count() if profile else 0
+    )
+    people_met = db.query(Meeting).filter(Meeting.user_id == user_id).count()
 
-    messages = db.query(Message).filter(Message.user_id == DEMO_USER_ID).all()
-    emails = db.query(EmailDraft).filter(EmailDraft.user_id == DEMO_USER_ID).all()
+    messages = db.query(Message).filter(Message.user_id == user_id).all()
+    emails = db.query(EmailDraft).filter(EmailDraft.user_id == user_id).all()
 
     drafts = len(messages) + len(emails)
     sent = sum(1 for m in messages if m.status == "sent_manually") + sum(
@@ -271,25 +274,29 @@ def _setup_steps(
     return steps
 
 
-def build_mission(db: Session) -> dict:
+def build_mission(db: Session, user_id: str) -> dict:
     """Aggregate everything the dashboard needs into one deterministic object."""
-    profile = db.query(Profile).filter(Profile.user_id == DEMO_USER_ID).first()
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     has_profile = profile is not None
     skills = matcher._profile_skills(profile) if profile else []
 
     goal = (
         db.query(Goal)
-        .filter(Goal.user_id == DEMO_USER_ID)
+        .filter(Goal.user_id == user_id)
         .order_by(Goal.id.desc())
         .first()
     )
     goal_dict = _goal_dict(goal)
 
-    best, best_job = _best_match(db)
+    best, best_job = _best_match(db, user_id)
     total_jobs = db.query(Job).count()
-    total_matches = db.query(JobMatch).count()
+    total_matches = (
+        db.query(JobMatch).filter(JobMatch.profile_id == profile.id).count()
+        if profile
+        else 0
+    )
     has_contacts = (
-        db.query(Contact).filter(Contact.user_id == DEMO_USER_ID).count() > 0
+        db.query(Contact).filter(Contact.user_id == user_id).count() > 0
     )
 
     # Build the contact plan + strategy for the best job (reuses strategy.py).
@@ -313,10 +320,10 @@ def build_mission(db: Session) -> dict:
             ),
         }
 
-    drafts = _drafts_summary(db)
-    follow_ups = _follow_ups_summary(db)
-    pipeline = _pipeline_summary(db)
-    momentum_summary = momentum.summary(db)
+    drafts = _drafts_summary(db, user_id)
+    follow_ups = _follow_ups_summary(db, user_id)
+    pipeline = _pipeline_summary(db, user_id)
+    momentum_summary = momentum.summary(db, user_id)
 
     setup_steps = _setup_steps(
         has_profile=has_profile,

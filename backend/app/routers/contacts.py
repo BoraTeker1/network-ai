@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import CONTACT_TYPES, DEMO_USER_ID, Contact, Goal, Job
+from ..deps import require_user
+from ..models import CONTACT_TYPES, Contact, Goal, Job, User
 from ..schemas import ContactManualIn, DiscoverIn
 from ..services import contact_discovery
 
@@ -38,7 +39,7 @@ def _serialize(c: Contact) -> dict:
 
 
 @router.post("/manual")
-def add_manual_contact(payload: ContactManualIn, db: Session = Depends(get_db)):
+def add_manual_contact(payload: ContactManualIn, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Add a contact the user found themselves. Never scraped, never invented."""
     if payload.contact_type and payload.contact_type not in CONTACT_TYPES:
         raise HTTPException(
@@ -51,7 +52,7 @@ def add_manual_contact(payload: ContactManualIn, db: Session = Depends(get_db)):
         company = job.company if job else None
 
     contact = Contact(
-        user_id=DEMO_USER_ID,
+        user_id=user.id,
         job_id=payload.job_id,
         name=payload.name,
         title=payload.title,
@@ -74,7 +75,7 @@ def add_manual_contact(payload: ContactManualIn, db: Session = Depends(get_db)):
 
 
 @router.post("/discover")
-def discover(payload: DiscoverIn, db: Session = Depends(get_db)):
+def discover(payload: DiscoverIn, db: Session = Depends(get_db), user: User = Depends(require_user)):
     """Aggregate manual contacts + any configured compliant provider.
 
     Returns {api_discovery_configured, providers_available, message, results}.
@@ -99,7 +100,7 @@ def discover(payload: DiscoverIn, db: Session = Depends(get_db)):
 
     existing = [
         _serialize(c)
-        for c in db.query(Contact).filter(Contact.user_id == DEMO_USER_ID).all()
+        for c in db.query(Contact).filter(Contact.user_id == user.id).all()
     ]
     job_dict = {"company": company, "title": job.title if job else None}
     goal_dict = {"outreach_goal": goal.outreach_goal if goal else None}
@@ -115,16 +116,16 @@ def discover(payload: DiscoverIn, db: Session = Depends(get_db)):
 
 
 @router.get("")
-def list_contacts(job_id: int | None = None, db: Session = Depends(get_db)):
-    q = db.query(Contact).filter(Contact.user_id == DEMO_USER_ID)
+def list_contacts(job_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    q = db.query(Contact).filter(Contact.user_id == user.id)
     if job_id is not None:
         q = q.filter(Contact.job_id == job_id)
     return [_serialize(c) for c in q.order_by(Contact.id.desc()).all()]
 
 
 @router.get("/{contact_id}")
-def get_contact(contact_id: int, db: Session = Depends(get_db)):
-    c = db.query(Contact).filter(Contact.id == contact_id).first()
+def get_contact(contact_id: int, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    c = db.query(Contact).filter(Contact.id == contact_id, Contact.user_id == user.id).first()
     if c is None:
         raise HTTPException(status_code=404, detail=f"Contact {contact_id} not found")
     return _serialize(c)

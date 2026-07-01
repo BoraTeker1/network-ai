@@ -24,30 +24,30 @@ def _profile(client):
 
 
 def test_award_is_idempotent(db_session):
-    first = momentum.award(db_session, "message", 1, "draft_approved")
-    second = momentum.award(db_session, "message", 1, "draft_approved")
+    first = momentum.award(db_session, "u-test", "message", 1, "draft_approved")
+    second = momentum.award(db_session, "u-test", "message", 1, "draft_approved")
     assert first is not None and first["points"] == 5
     assert second is None  # same milestone never re-awards
 
 
 def test_unknown_event_awards_nothing(db_session):
-    assert momentum.award(db_session, "message", 1, None) is None
-    assert momentum.award(db_session, "message", 1, "not_a_real_event") is None
+    assert momentum.award(db_session, "u-test", "message", 1, None) is None
+    assert momentum.award(db_session, "u-test", "message", 1, "not_a_real_event") is None
 
 
 def test_tracked_no_points_is_logged_without_points(db_session):
-    award = momentum.award(db_session, "message", 9, "tracked_no_points")
+    award = momentum.award(db_session, "u-test", "message", 9, "tracked_no_points")
     assert award is not None
     assert award["points"] == 0
     assert award["celebration"] == "none"
 
 
 def test_summary_totals_and_recent_wins(db_session):
-    momentum.award(db_session, "message", 1, "draft_approved")   # +5
-    momentum.award(db_session, "message", 1, "sent_manual")      # +10
-    momentum.award(db_session, "message", 2, "interview_received")  # +100
-    momentum.award(db_session, "message", 3, "tracked_no_points")   # +0
-    s = momentum.summary(db_session)
+    momentum.award(db_session, "u-test", "message", 1, "draft_approved")   # +5
+    momentum.award(db_session, "u-test", "message", 1, "sent_manual")      # +10
+    momentum.award(db_session, "u-test", "message", 2, "interview_received")  # +100
+    momentum.award(db_session, "u-test", "message", 3, "tracked_no_points")   # +0
+    s = momentum.summary(db_session, "u-test")
     assert s["total_points"] == 115
     assert s["points_today"] == 115
     assert s["streak"] == 1
