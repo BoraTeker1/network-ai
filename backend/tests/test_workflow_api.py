@@ -1,4 +1,4 @@
-"""End-to-end API tests: profile → match → message approval → outcome → stats,
+"""End-to-end API tests: profile → pipeline message approval → outcome,
 plus the email draft/approve queue and the disabled Gmail send.
 
 The LLM is forced unavailable so email drafting uses the deterministic template
@@ -42,27 +42,14 @@ def test_save_profile_parses_skills(client):
     assert "Docker" in profile["skills"]
 
 
-def test_match_endpoint_returns_breakdown(client, seeded_job):
+def test_message_approval_and_outcome_flow(client):
     _save_profile(client)
-    r = client.post(f"/jobs/{seeded_job.id}/match")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["match_score"] >= 75
-    assert data["recommendation"] == "Strong Target"
-    assert len(data["breakdown"]) == 4
-    assert data["matched_skills"]
-
-
-def test_match_without_profile_is_400(client, seeded_job):
-    r = client.post(f"/jobs/{seeded_job.id}/match")
-    assert r.status_code == 400
-
-
-def test_message_approval_and_outcome_flow(client, seeded_job):
-    _save_profile(client)
-    drafts = client.post("/messages/generate", json={"job_id": seeded_job.id}).json()
-    assert len(drafts) == 4
-    mid = drafts[0]["id"]
+    saved = client.post("/outreach/save-draft", json={
+        "body": "Hi — I'd love to connect about the Software Engineer role at Acme.",
+        "company": "Acme", "role": "Software Engineer",
+        "channel": "email", "language": "en",
+    }).json()
+    mid = saved["id"]
 
     assert client.post(f"/messages/{mid}/approve").json()["status"] == "approved"
     assert client.post(f"/messages/{mid}/reject").json()["status"] == "rejected"
@@ -73,21 +60,6 @@ def test_message_approval_and_outcome_flow(client, seeded_job):
 
     bad = client.post(f"/messages/{mid}/outcome", json={"outcome": "nonsense"})
     assert bad.status_code == 400
-
-
-def test_stats_counts_update(client, seeded_job):
-    _save_profile(client)
-    client.post(f"/jobs/{seeded_job.id}/match")
-    drafts = client.post("/messages/generate", json={"job_id": seeded_job.id}).json()
-    client.post(f"/messages/{drafts[0]['id']}/mark-sent-manually")
-    client.post(f"/messages/{drafts[0]['id']}/outcome", json={"outcome": "replied"})
-
-    stats = client.get("/stats").json()
-    assert stats["total_jobs"] == 1
-    assert stats["strong_targets"] >= 1
-    assert stats["total_messages"] == 4
-    assert stats["status_counts"]["sent_manually"] == 1
-    assert stats["outcome_counts"]["replied"] == 1
 
 
 def test_email_draft_fallback_and_disabled_gmail(client, seeded_job, monkeypatch):

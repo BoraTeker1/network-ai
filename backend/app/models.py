@@ -10,7 +10,6 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -103,23 +102,6 @@ FOLLOW_UP_STATUSES = (
     "no_response",
 )
 
-# Momentum (Vibe Mode gamification). Points reward *quality* progress — real
-# milestones the user manually confirms — never volume, bulk, or scraping.
-# "tracked_no_points" lets a neutral outcome (ignored/rejected/connected) be
-# logged with zero points and zero shame.
-MOMENTUM_EVENT_TYPES = (
-    "draft_approved",
-    "copied",
-    "sent_manual",
-    "follow_up_completed",
-    "person_met",
-    "reply_received",
-    "referral_received",
-    "interview_received",
-    "tracked_no_points",
-)
-
-
 class Profile(Base):
     __tablename__ = "profiles"
 
@@ -134,8 +116,6 @@ class Profile(Base):
     target_roles = Column(Text, nullable=True)      # JSON list of strings
 
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    matches = relationship("JobMatch", back_populates="profile")
 
 
 class Job(Base):
@@ -177,24 +157,7 @@ class Job(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     discovered_at = Column(DateTime, default=datetime.utcnow)
 
-    matches = relationship("JobMatch", back_populates="job")
     messages = relationship("Message", back_populates="job")
-
-
-class JobMatch(Base):
-    __tablename__ = "job_matches"
-
-    id = Column(Integer, primary_key=True, index=True)
-    profile_id = Column(Integer, ForeignKey("profiles.id"), index=True)
-    job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
-
-    score = Column(Float, default=0.0)
-    reasons = Column(Text, nullable=True)  # human-readable why-it-matched
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    profile = relationship("Profile", back_populates="matches")
-    job = relationship("Job", back_populates="matches")
 
 
 class Message(Base):
@@ -311,36 +274,6 @@ class Contact(Base):
     job = relationship("Job")
 
 
-class Meeting(Base):
-    """A person the user actually MET — at an event, online, or via an intro.
-
-    This is the core "presence" signal: it turns showing up into a tracked
-    relationship. Logged manually by the user (never scraped/auto-detected), it
-    powers the presence funnel and earns Momentum. Distinct from Contact, which
-    is "someone to reach out to" — a Meeting is "someone I already connected with."
-    """
-
-    __tablename__ = "meetings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=False)
-    job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
-
-    name = Column(String, nullable=False)
-    title = Column(String, nullable=True)
-    company = Column(String, nullable=True)
-    where_met = Column(String, nullable=True)       # event/place, e.g. "JS Conf NY"
-    met_on = Column(String, nullable=True)          # ISO date (YYYY-MM-DD)
-    contact_type = Column(String, nullable=True)    # one of CONTACT_TYPES
-    linkedin_url = Column(String, nullable=True)
-    note = Column(Text, nullable=True)
-    followed_up = Column(Boolean, default=False)    # did the user follow up yet?
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    job = relationship("Job")
-
-
 class EmailDraft(Base):
     """An AI- or template-generated email draft awaiting user review/approval.
 
@@ -375,33 +308,6 @@ class EmailDraft(Base):
     job = relationship("Job")
     contact = relationship("Contact")
     goal = relationship("Goal")
-
-
-class MomentumEvent(Base):
-    """A single awarded Momentum event (Vibe Mode gamification).
-
-    Each (subject_type, subject_id, event_type) can be awarded only once — the
-    unique constraint prevents double-counting when the user clicks the same
-    outcome twice. Points reward confirmed, quality progress, never volume."""
-
-    __tablename__ = "momentum_events"
-    __table_args__ = (
-        UniqueConstraint(
-            "subject_type", "subject_id", "event_type", name="uq_momentum_once"
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=False)
-
-    # What the event was awarded for, e.g. ("message", 12) or ("email", 3).
-    subject_type = Column(String, index=True, nullable=True)
-    subject_id = Column(Integer, index=True, nullable=True)
-
-    event_type = Column(String, index=True)   # one of MOMENTUM_EVENT_TYPES
-    points = Column(Integer, default=0)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ----- Usage tracking (plan gates) ---------------------------------------------

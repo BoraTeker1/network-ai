@@ -5,6 +5,8 @@ same in-memory DB). Foreign IDs must return 404 — never 403 (don't leak
 existence), never 200.
 """
 
+from app.models import Job
+
 
 def _save_outreach(c, company="Acme Cloud"):
     r = c.post(
@@ -66,12 +68,6 @@ def test_contacts_are_isolated(client, client_b):
     assert client_b.get(f"/contacts/{contact['id']}").status_code == 404
 
 
-def test_meetings_are_isolated(client, client_b):
-    meeting = client.post("/meetings", json={"name": "Deniz Kaya"}).json()
-    assert client_b.get("/meetings").json() == []
-    assert client_b.delete(f"/meetings/{meeting['id']}").status_code == 404
-
-
 def test_next_move_cannot_link_foreign_message(client, client_b):
     a_msg = _save_outreach(client)
     r = client_b.post(
@@ -88,26 +84,14 @@ def test_next_move_cannot_link_foreign_message(client, client_b):
     assert r.json()["pipeline_target"] == {"type": "message", "id": a_msg["id"]}
 
 
-def test_momentum_and_stats_are_isolated(client, client_b):
-    a_msg = _save_outreach(client)
-    client.post(f"/messages/{a_msg['id']}/outcome", json={"outcome": "replied"})
-
-    a_summary = client.get("/momentum/summary").json()
-    b_summary = client_b.get("/momentum/summary").json()
-    assert a_summary["total_points"] > 0
-    assert b_summary["total_points"] == 0
-
-    a_stats = client.get("/stats").json()
-    b_stats = client_b.get("/stats").json()
-    assert a_stats["total_messages"] == 1
-    assert b_stats["total_messages"] == 0
-    assert b_stats["outcome_counts"]["replied"] == 0
-
-
 def test_emails_are_isolated(client, client_b, db_session):
     # Seed A a job + contact, then draft an email as A.
-    client.post("/demo/seed")
-    job_id = client.get("/jobs").json()[0]["id"]
+    job = Job(source="test", external_id="iso1", company="Acme",
+              title="Backend Engineer", location="Remote")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+    job_id = job.id
     contact = client.post(
         "/contacts/manual", json={"name": "Sam Lee", "job_id": job_id}
     ).json()

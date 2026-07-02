@@ -31,7 +31,6 @@ FREE_DAILY_LIMITS: dict[str, int] = {
     "outreach_draft": 5,
     "next_move": 5,
     "email_draft": 10,
-    "message_generate": 10,
     "resume_upload": 10,
 }
 # Total (not daily) free-tier caps.

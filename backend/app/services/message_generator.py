@@ -1,33 +1,10 @@
-"""Outreach message draft generator + deterministic quality checklist.
+"""Deterministic quality checklist + tone labels for outreach drafts.
 
-Template-based drafts — no LLM. Pure functions: the router supplies the
-profile skills + job details, this builds natural-sounding message texts and
-can score each draft against a transparent quality checklist.
-
-Guardrails baked into the templates:
-  - Never invents shared background, schools, or specific people.
-  - Never claims the user already applied (only "interested in").
-  - Never fakes personalization — if no contact name is given, the greeting
-    stays generic instead of pretending familiarity.
-  - Keeps a low-pressure ask; never demands a referral.
-  - connection_request stays under 280 characters (LinkedIn's limit).
-
-The four draft types:
-  - connection_request    short LinkedIn connection note (<280 chars)
-  - recruiter_follow_up    a note to a recruiter about next steps
-  - engineer_advice_request a peer-level request for advice from an engineer
-  - alumni_style_message    a warm note framed around shared early-career path
+Pure functions, no LLM: the messages router uses these to score every draft
+in the pipeline against a transparent, explainable checklist.
 """
 
 CONNECTION_LIMIT = 280
-
-# Message types we always produce, in display order.
-MESSAGE_TYPES = (
-    "connection_request",
-    "recruiter_follow_up",
-    "engineer_advice_request",
-    "alumni_style_message",
-)
 
 # Deterministic tone label per draft type (shown as a chip in the UI). Tones:
 # concise | warm | direct | low-pressure.
@@ -42,99 +19,6 @@ TONE_BY_TYPE = {
 def tone_for(message_type: str) -> str:
     """Tone label for a message type (defaults to low-pressure)."""
     return TONE_BY_TYPE.get(message_type, "low-pressure")
-
-
-def _greeting(contact_name: str | None) -> str:
-    """First-name greeting when we have a name, otherwise a generic one.
-
-    We never guess a name — a generic greeting is more honest than a fake
-    personalization.
-    """
-    if contact_name and contact_name.strip():
-        first = contact_name.strip().split()[0]
-        return f"Hi {first},"
-    return "Hi,"
-
-
-def _skill_phrase(skills: list[str], n: int = 2) -> str:
-    """Short, human phrase from the user's strongest (first-listed) skills."""
-    chosen = [s for s in (skills or []) if s][:n]
-    if not chosen:
-        return "software engineering"
-    if len(chosen) == 1:
-        return chosen[0]
-    return " and ".join(chosen)
-
-
-def _connection_request(company: str, role: str, skills: list[str], g: str) -> str:
-    """A short, natural connection note that stays under the 280 char limit.
-
-    Trims the skill phrase before falling back to a skill-free version so the
-    note always fits.
-    """
-    for n in (2, 1):
-        phrase = _skill_phrase(skills, n)
-        text = (
-            f"{g} I'm a new grad working with {phrase}, and I'm interested in the "
-            f"{role} role at {company}. Would love to connect and follow your team's work."
-        )
-        if len(text) <= CONNECTION_LIMIT:
-            return text
-    text = (
-        f"{g} New-grad engineer interested in the {role} role at {company}. "
-        f"Would love to connect and follow your team's work."
-    )
-    return text if len(text) <= CONNECTION_LIMIT else text[: CONNECTION_LIMIT - 1]
-
-
-def _recruiter_follow_up(company: str, role: str, skills: list[str], g: str) -> str:
-    phrase = _skill_phrase(skills)
-    return (
-        f"{g} thanks for connecting. I'm a new grad focused on {phrase} and I'm "
-        f"interested in the {role} role at {company}. Is this a good time to apply, "
-        f"and is there anything you'd suggest I highlight? Happy to share my resume."
-    )
-
-
-def _engineer_advice_request(company: str, role: str, skills: list[str], g: str) -> str:
-    phrase = _skill_phrase(skills)
-    return (
-        f"{g} I'm a new grad who works mostly with {phrase}, and I've been looking at "
-        f"the {role} role at {company}. Would you be open to a few minutes on what the "
-        f"team is like and what helped you ramp up? No pressure either way — thanks."
-    )
-
-
-def _alumni_style_message(company: str, role: str, skills: list[str], g: str) -> str:
-    phrase = _skill_phrase(skills)
-    return (
-        f"{g} I'm early in my career working with {phrase}, and I'm hoping to break "
-        f"into a role like the {role} position at {company}. I'd really value any "
-        f"advice you have for someone making that jump. Thanks for reading."
-    )
-
-
-_BUILDERS = {
-    "connection_request": _connection_request,
-    "recruiter_follow_up": _recruiter_follow_up,
-    "engineer_advice_request": _engineer_advice_request,
-    "alumni_style_message": _alumni_style_message,
-}
-
-
-def build_drafts(
-    profile_skills: list[str],
-    company: str,
-    role: str,
-    contact_name: str | None = None,
-    contact_title: str | None = None,
-) -> list[tuple[str, str]]:
-    """Return [(message_type, text), ...] for the 4 draft variants."""
-    g = _greeting(contact_name)
-    return [
-        (mtype, _BUILDERS[mtype](company, role, profile_skills, g))
-        for mtype in MESSAGE_TYPES
-    ]
 
 
 # ----- Quality checklist (deterministic) -----

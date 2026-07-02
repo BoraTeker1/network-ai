@@ -31,7 +31,6 @@ DEFAULT_LIMITS: dict[str, int] = {
     "resume_upload": 6,
     "opps_refresh": 2,
     "email_draft": 10,
-    "message_generate": 10,
 }
 
 # (action, key) -> [window_minute, count, audit_logged_this_window]

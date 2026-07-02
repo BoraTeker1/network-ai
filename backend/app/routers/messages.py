@@ -1,11 +1,9 @@
 """Message endpoints.
 
-Draft generation + the Cursor-style approval workflow: AI proposes drafts,
-the user reviews / edits / approves / rejects / copies / marks-sent manually.
-Nothing is ever auto-sent.
+The Cursor-style approval workflow for outreach drafts: AI proposes, the user
+reviews / edits / approves / rejects / copies / marks-sent manually. Nothing
+is ever auto-sent. Drafts are created by the /outreach copilot.
 """
-
-import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -15,16 +13,13 @@ from ..deps import require_user
 from ..models import (
     FOLLOW_UP_STATUSES,
     OUTCOMES,
-    Job,
     Message,
     OutreachEvent,
-    Profile,
     User,
 )
-from ..schemas import FollowUpIn, MessageGenerateIn, MessagePatch, OutcomeIn
-from ..services import message_generator, momentum, plans
-from ..services.rate_limit import rate_limit
-from ..services.matcher import get_profile
+from ..schemas import FollowUpIn, MessagePatch, OutcomeIn
+from ..services import message_generator
+from ..services.profiles import get_profile, profile_skills
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -34,13 +29,7 @@ VALID_STATUSES = {"draft", "approved", "rejected", "copied", "sent_manually"}
 
 def _user_skills(db: Session, user_id: str) -> list[str]:
     """Profile skills for the user (used by the quality checklist)."""
-    profile = get_profile(db, user_id)
-    if profile is None or not profile.skills:
-        return []
-    try:
-        return json.loads(profile.skills)
-    except (ValueError, TypeError):
-        return []
+    return profile_skills(get_profile(db, user_id))
 
 
 def _serialize(msg: Message, profile_skills: list[str] | None = None) -> dict:
@@ -110,59 +99,7 @@ def _set_status(db: Session, message_id: int, status: str, event_type: str,
     _log_event(db, message_id, event_type)
     db.commit()
     db.refresh(msg)
-    # Award Momentum for real progress (approve/copy/manual-send). Reject earns
-    # nothing — STATUS_EVENT has no mapping for it, so award() returns None.
-    award = momentum.award(db, user_id, "message", message_id, momentum.STATUS_EVENT.get(status))
-    res = _serialize(msg, _user_skills(db, user_id))
-    res["momentum"] = award
-    return res
-
-
-# ----- Generation -----
-
-@router.post("/generate")
-def generate_messages(
-    payload: MessageGenerateIn,
-    db: Session = Depends(get_db),
-    _rl: None = Depends(rate_limit("message_generate")),
-    user: User = Depends(plans.enforce_limit("message_generate")),
-):
-    """Generate and store the 4 draft variants for a job (status='draft')."""
-    profile: Profile | None = get_profile(db, user.id)
-    if profile is None:
-        raise HTTPException(
-            status_code=400, detail="No profile saved yet — paste a resume first."
-        )
-
-    job = db.query(Job).filter(Job.id == payload.job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
-
-    skills = json.loads(profile.skills) if profile.skills else []
-    drafts = message_generator.build_drafts(
-        profile_skills=skills,
-        company=job.company or "the company",
-        role=job.title or "this role",
-        contact_name=payload.contact_name,
-        contact_title=payload.contact_title,
-    )
-
-    created: list[Message] = []
-    for message_type, text in drafts:
-        msg = Message(
-            user_id=user.id,
-            job_id=job.id,
-            message_type=message_type,
-            content=text,
-            status="draft",
-        )
-        db.add(msg)
-        created.append(msg)
-
-    db.commit()
-    for msg in created:
-        db.refresh(msg)
-    return [_serialize(msg, skills) for msg in created]
+    return _serialize(msg, _user_skills(db, user_id))
 
 
 # ----- Reads -----
@@ -246,12 +183,7 @@ def set_outcome(message_id: int, payload: OutcomeIn, db: Session = Depends(get_d
     )
     db.commit()
     db.refresh(msg)
-    award = momentum.award(
-        db, user.id, "message", message_id, momentum.OUTCOME_EVENT.get(payload.outcome)
-    )
-    res = _serialize(msg, _user_skills(db, user.id))
-    res["momentum"] = award
-    return res
+    return _serialize(msg, _user_skills(db, user.id))
 
 
 # ----- Follow-up tracking -----
@@ -278,9 +210,4 @@ def set_follow_up(message_id: int, payload: FollowUpIn, db: Session = Depends(ge
     _log_event(db, message_id, f"follow_up:{payload.status}")
     db.commit()
     db.refresh(msg)
-    award = momentum.award(
-        db, user.id, "message", message_id, momentum.FOLLOW_UP_EVENT.get(payload.status)
-    )
-    res = _serialize(msg, _user_skills(db, user.id))
-    res["momentum"] = award
-    return res
+    return _serialize(msg, _user_skills(db, user.id))

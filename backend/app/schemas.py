@@ -55,62 +55,7 @@ class ProfileOut(BaseModel):
         from_attributes = True
 
 
-# ----- Job -----
-
-class JobOut(BaseModel):
-    id: int
-    source: str
-    external_id: Optional[str] = None
-    company: Optional[str] = None
-    title: Optional[str] = None
-    location: Optional[str] = None
-    url: Optional[str] = None
-    posted_at: Optional[str] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class IngestResult(BaseModel):
-    ingested: int
-    skipped_duplicates: int
-    total_in_db: int
-
-
-class NewGradIngestIn(BaseModel):
-    """Optional knobs for the newgrad-jobs.com ingestion (all have safe defaults)."""
-
-    categories: Optional[List[str]] = None       # default category set if None
-    max_per_category: Optional[int] = 15         # conservative cap per category
-    request_delay: Optional[float] = None        # seconds between detail fetches
-
-
-# ----- Job match -----
-
-class JobMatchOut(BaseModel):
-    id: int
-    job_id: int
-    profile_id: int
-    score: float
-    reasons: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
 # ----- Message -----
-
-class MessageCreate(BaseModel):
-    job_id: Optional[int] = None
-    message_type: str = "connection_request"
-
-
-class MessageGenerateIn(BaseModel):
-    job_id: int
-    contact_name: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
-    contact_title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
-
 
 class MessagePatch(BaseModel):
     draft_text: str = Field(max_length=MAX_BODY_CHARS)
@@ -124,11 +69,6 @@ class OutcomeIn(BaseModel):
 class FollowUpIn(BaseModel):
     status: str = Field(max_length=50)               # one of FOLLOW_UP_STATUSES
     due_date: Optional[str] = Field(None, max_length=20)  # ISO date (YYYY-MM-DD)
-
-
-class MessageUpdate(BaseModel):
-    content: Optional[str] = Field(None, max_length=MAX_BODY_CHARS)
-    status: Optional[str] = Field(None, max_length=50)
 
 
 class MessageOut(BaseModel):
@@ -281,25 +221,6 @@ class OpportunityImportIn(BaseModel):
     jobs: List[dict]
     source: Optional[str] = "manual-import"
     is_sample: bool = False
-
-
-# ----- Meetings (people you actually met — presence tracking) -----
-
-class MeetingIn(BaseModel):
-    name: str = Field(max_length=MAX_NAME_CHARS)
-    title: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
-    company: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)
-    where_met: Optional[str] = Field(None, max_length=MAX_NAME_CHARS)  # event/place
-    met_on: Optional[str] = Field(None, max_length=20)   # ISO date; defaults to today
-    job_id: Optional[int] = None             # the opportunity this relates to
-    contact_type: Optional[str] = Field(None, max_length=50)  # one of CONTACT_TYPES
-    linkedin_url: Optional[str] = Field(None, max_length=MAX_URL_CHARS)
-    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
-
-
-class MeetingPatch(BaseModel):
-    followed_up: Optional[bool] = None
-    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
 
 
 # ----- Generic -----

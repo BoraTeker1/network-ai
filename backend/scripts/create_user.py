@@ -26,14 +26,12 @@ from app.models import (  # noqa: E402
     Contact,
     EmailDraft,
     Goal,
-    Meeting,
     Message,
-    MomentumEvent,
     Profile,
 )
 from app.services import auth  # noqa: E402
 
-USER_OWNED_MODELS = (Profile, Message, Goal, Contact, Meeting, EmailDraft, MomentumEvent)
+USER_OWNED_MODELS = (Profile, Message, Goal, Contact, EmailDraft)
 
 
 def main() -> int:

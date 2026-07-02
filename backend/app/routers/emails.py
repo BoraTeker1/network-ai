@@ -25,7 +25,8 @@ from ..models import (
     User,
 )
 from ..schemas import EmailDraftIn, EmailPatchIn, GmailSendIn
-from ..services import email_generator, gmail_sender, matcher, momentum, plans
+from ..services import email_generator, gmail_sender, plans
+from ..services.profiles import get_profile, profile_skills
 from ..services.rate_limit import rate_limit
 
 router = APIRouter(prefix="/emails", tags=["emails"])
@@ -116,8 +117,8 @@ def draft_email(
         else None
     )
 
-    profile = matcher.get_profile(db, user.id)
-    skills = matcher._profile_skills(profile) if profile else []
+    profile = get_profile(db, user.id)
+    skills = profile_skills(profile)
     summary = profile.experience_summary if profile else None
 
     goal_dict = {
@@ -195,8 +196,7 @@ def patch_email(email_id: int, payload: EmailPatchIn, db: Session = Depends(get_
     if payload.body is not None:
         e.body = payload.body
     if payload.subject is not None or payload.body is not None:
-        profile = matcher.get_profile(db, user.id)
-        skills = matcher._profile_skills(profile) if profile else []
+        skills = profile_skills(get_profile(db, user.id))
         quality = email_generator.quality_checklist(
             subject=e.subject,
             body=e.body,
@@ -228,16 +228,7 @@ def patch_email(email_id: int, payload: EmailPatchIn, db: Session = Depends(get_
 
     db.commit()
     db.refresh(e)
-    # Award Momentum for a reported outcome or a completed follow-up (once each).
-    event_type = None
-    if payload.outcome is not None:
-        event_type = momentum.OUTCOME_EVENT.get(payload.outcome)
-    elif payload.follow_up_status is not None:
-        event_type = momentum.FOLLOW_UP_EVENT.get(payload.follow_up_status)
-    award = momentum.award(db, user.id, "email", email_id, event_type)
-    res = _serialize(e, db)
-    res["momentum"] = award
-    return res
+    return _serialize(e, db)
 
 
 # ----- Approval workflow (explicit, manual) -----
@@ -247,10 +238,7 @@ def _set_status(db: Session, email_id: int, status: str, user_id: str) -> dict:
     e.status = status
     db.commit()
     db.refresh(e)
-    award = momentum.award(db, user_id, "email", email_id, momentum.STATUS_EVENT.get(status))
-    res = _serialize(e, db)
-    res["momentum"] = award
-    return res
+    return _serialize(e, db)
 
 
 @router.post("/{email_id}/approve")

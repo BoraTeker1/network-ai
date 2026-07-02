@@ -13,7 +13,6 @@ import {
   FollowUpBadge,
   QualityChecklist,
 } from "@/components/ui";
-import { useMomentum } from "@/components/MomentumProvider";
 
 function defaultDueDate(): string {
   const d = new Date();
@@ -35,7 +34,6 @@ export default function EmailDraftCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gmailMsg, setGmailMsg] = useState<string | null>(null);
-  const { celebrate } = useMomentum();
 
   // LinkedIn drafts are stored as EmailDraft rows but render differently: no
   // subject line, a character counter (LinkedIn caps connection notes at 300),
@@ -56,7 +54,6 @@ export default function EmailDraftCard({
     try {
       const updated = await fn();
       onUpdated(updated);
-      celebrate(updated.momentum);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {

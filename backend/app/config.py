@@ -81,18 +81,6 @@ def get_pdl_api_key() -> str:
     return _get("PDL_API_KEY")
 
 
-# ----- Event recommendation providers (optional, compliant APIs only) -----
-# Leave blank to keep API-backed event discovery OFF. The feature still works
-# with high-quality manual search links. No scraping is ever performed.
-
-def get_eventbrite_api_token() -> str:
-    return _get("EVENTBRITE_API_TOKEN")
-
-
-def get_meetup_api_key() -> str:
-    return _get("MEETUP_API_KEY")
-
-
 # ----- Deployment / security (production-readiness layer) -----
 
 def get_allowed_origins() -> list[str]:

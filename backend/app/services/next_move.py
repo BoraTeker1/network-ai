@@ -12,7 +12,7 @@ verification never depends on the model's self-report.
 
 import json
 
-from . import llm_client, momentum
+from . import llm_client
 
 WORD_LIMIT = 180
 
@@ -353,21 +353,6 @@ def safety_checklist(*, intent, signals, subject, body, short) -> dict:
     return {"items": items, "passed": passed, "total": len(items)}
 
 
-# ----- Suggested momentum preview -----
-
-def _momentum_preview(outcome: str | None) -> dict | None:
-    if not outcome:
-        return None
-    event_type = momentum.OUTCOME_EVENT.get(outcome)
-    if not event_type:
-        return None
-    return {
-        "event_type": event_type,
-        "points": momentum.POINTS.get(event_type, 0),
-        "label": momentum.LABELS.get(event_type, event_type),
-    }
-
-
 # ----- LLM prompt -----
 
 def _build_prompt(*, reply_text, company, role, contact_name, contact_title) -> str:
@@ -495,7 +480,6 @@ def analyze_reply(*, reply_text: str, context: dict) -> dict:
         "recommended_next_action": recommended,
         "risk_notes": risk,
         "suggested_pipeline_update": suggested_outcome,
-        "suggested_momentum": _momentum_preview(suggested_outcome),
         "drafted_email": drafted_email,
         "drafted_short_message": drafted_short,
         "quality_checklist": quality,

@@ -61,9 +61,9 @@ export default function EmailsPage() {
         <div className="mt-6">
           <EmptyState
             title="No email drafts yet"
-            description="Open a strong-target job, add or discover a contact, then click “Draft Email”. Drafts land here for review and approval."
-            ctaHref="/matches"
-            ctaLabel="Go to matches →"
+            description="Pick an opportunity, add a contact, and draft outreach — drafts land here for review and approval."
+            ctaHref="/opportunities"
+            ctaLabel="Browse opportunities →"
           />
         </div>
       ) : (

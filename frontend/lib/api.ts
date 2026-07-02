@@ -14,104 +14,6 @@ export type Profile = {
   created_at: string | null;
 };
 
-export type Job = {
-  id: number;
-  source: string;
-  company: string | null;
-  title: string | null;
-  location: string | null;
-  url: string | null;
-  // Richer normalized fields — populated by adapters like newgrad-jobs.com;
-  // older Simplify rows leave these null/empty.
-  employment_type?: string | null;
-  work_mode?: string | null;
-  salary_range?: string | null;
-  level?: string | null;
-  description?: string | null;
-  responsibilities?: string[];
-  qualifications?: string[];
-  benefits?: string[];
-  source_url?: string | null;
-  external_apply_url?: string | null;
-  is_closed?: boolean;
-  posted_at?: string | null;
-  created_at: string | null;
-  discovered_at?: string | null;
-};
-
-export type NewGradIngestResult = {
-  source: string;
-  categories: string[];
-  fetched_count: number;
-  created_count: number;
-  updated_count: number;
-  skipped_closed_count: number;
-  duplicate_count: number;
-  errors: string[];
-  total_in_db: number;
-};
-
-export type MatchBreakdownItem = {
-  label: string;
-  points: number;
-  max: number;
-  detail: string;
-};
-
-export type RankedMatch = {
-  job_id: number;
-  company: string | null;
-  title: string | null;
-  location: string | null;
-  url: string | null;
-  match_score: number;
-  recommendation: string | null;
-  next_best_action: string | null;
-  explanation: string | null;
-  matched_skills: string[];
-  missing_skills: string[];
-  breakdown: MatchBreakdownItem[];
-};
-
-export type MatchResult = {
-  job_id: number;
-  company: string | null;
-  title: string | null;
-  location?: string | null;
-  url?: string | null;
-  match_score: number;
-  recommendation: string | null;
-  next_best_action: string | null;
-  explanation: string | null;
-  matched_skills: string[];
-  missing_skills: string[];
-  breakdown: MatchBreakdownItem[];
-};
-
-export type StrategyStep = {
-  step: number;
-  title: string;
-  detail: string;
-};
-
-export type OutreachStrategy = {
-  label: string;
-  score: number;
-  who_first: string;
-  contact_count: string;
-  tone: string;
-  ask_type: string;
-  sequence: StrategyStep[];
-  next_best_action: string;
-};
-
-export type ContactSearch = {
-  label: string;
-  query: string;
-  google_search_url: string;
-  linkedin_search_url: string;
-};
-
 export type ChecklistItem = {
   key: string;
   label: string;
@@ -124,29 +26,6 @@ export type Checklist = {
   total: number;
 };
 
-// ----- Momentum (Vibe Mode gamification) -----
-
-export type MomentumAward = {
-  event_type: string;
-  points: number;
-  label: string;
-  celebration: "big" | "medium" | "small" | "none";
-  message: string;
-};
-
-export type MomentumWin = {
-  event_type: string;
-  label: string;
-  points: number;
-  created_at: string | null;
-};
-
-export type MomentumSummary = {
-  points_today: number;
-  total_points: number;
-  streak: number;
-  recent_wins: MomentumWin[];
-};
 
 // ----- Next Move AI -----
 
@@ -163,7 +42,6 @@ export type NextMoveAnalysis = {
   recommended_next_action: string;
   risk_notes: string;
   suggested_pipeline_update: string | null;
-  suggested_momentum: { event_type: string; points: number; label: string } | null;
   drafted_email: { subject: string; body: string };
   drafted_short_message: string;
   quality_checklist: Checklist;
@@ -384,7 +262,6 @@ export type Message = {
   char_count: number;
   checklist: Checklist;
   // Present only on action responses (approve/copy/sent/outcome/follow-up).
-  momentum?: MomentumAward | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -504,7 +381,6 @@ export type EmailDraft = {
   suggested_next_step: string | null;
   llm_used: boolean;
   // Present only on action responses (approve/copy/sent/outcome/follow-up).
-  momentum?: MomentumAward | null;
   status: string;
   outcome: string | null;
   follow_up_status: string | null;
@@ -538,231 +414,7 @@ export const FOLLOW_UP_STATUSES = [
 ] as const;
 export type FollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number];
 
-export type FunnelStage = { label: string; value: number };
-
-export type DashboardStats = {
-  total_jobs: number;
-  total_matches: number;
-  strong_targets: number;
-  total_messages: number;
-  status_counts: Record<string, number>;
-  outcome_counts: Record<string, number>;
-  follow_ups_due: number;
-  funnel: FunnelStage[];
-  top_matches: RankedMatch[];
-  recent_messages: Message[];
-};
-
-// ----- Today's Networking Mission (dashboard command center) -----
-
-export type RecommendedContactType = {
-  contact_type: string;
-  label: string;
-  why: string;
-};
-
-export type ContactPlan = {
-  who_first: string;
-  contact_count: string;
-  tone: string;
-  ask_type: string;
-  sequence: StrategyStep[];
-  recommended_contact_types: RecommendedContactType[];
-};
-
-export type SetupStep = {
-  key: string;
-  title: string;
-  description: string;
-  cta_href: string;
-  cta_label: string;
-  done: boolean;
-};
-
-export type FollowUpItem = {
-  kind: "message" | "email";
-  id: number;
-  company: string | null;
-  role: string | null;
-  due_date: string | null;
-};
-
-export type Mission = {
-  ready: boolean;
-  headline: string;
-  focus: string | null;
-  profile: { exists: boolean; skills_count: number; skills: string[] };
-  goal: {
-    id: number;
-    target_role: string | null;
-    target_location: string | null;
-    target_company_type: string | null;
-    outreach_goal: string | null;
-    tone_preference: string | null;
-    preferred_contact_types: string[];
-  } | null;
-  best_job: RankedMatch | null;
-  match_label: string | null;
-  match_explanation: string | null;
-  recommended_next_action: string | null;
-  contact_plan: ContactPlan | null;
-  drafts: {
-    message_drafts: number;
-    email_drafts: number;
-    pending_review: number;
-    ready_to_send: number;
-  };
-  follow_ups: { due: number; items: FollowUpItem[] };
-  pipeline: {
-    jobs_found: number;
-    strong_matches: number;
-    people_met: number;
-    drafts: number;
-    sent: number;
-    replies: number;
-    interviews: number;
-    funnel: FunnelStage[];
-  };
-  momentum: MomentumSummary;
-  setup_steps: SetupStep[];
-  next_setup_step: SetupStep | null;
-};
-
-// ----- Event / conference networking recommendations -----
-
-export type EventSearchQuery = {
-  label: string;
-  provider: "google" | "eventbrite" | "meetup" | "luma" | "company";
-  query: string;
-  url: string;
-  why: string;
-};
-
-export type EventRecommendation = {
-  title: string;
-  organizer: string | null;
-  event_type:
-    | "conference"
-    | "meetup"
-    | "career_fair"
-    | "hackathon"
-    | "tech_talk"
-    | "webinar"
-    | "other";
-  relevance_reason: string;
-  matched_terms: string[];
-  start_datetime: string | null;
-  end_datetime: string | null;
-  location: string | null;
-  is_online: boolean | null;
-  source_name: string;
-  source_url: string;
-  fetched_at: string;
-  freshness_label: "fresh" | "upcoming" | "stale_unknown";
-  confidence: "high" | "medium" | "low";
-  rank_score: number;
-};
-
-export type EventProviderResult = {
-  provider: string;
-  configured: boolean;
-  ok: boolean;
-  count: number;
-  note: string;
-};
-
-export type EventSearchContext = {
-  job_title: string | null;
-  company: string | null;
-  role_family: string;
-  role_family_keywords: string[];
-  matched_skills: string[];
-  location: string | null;
-  city: string | null;
-  is_remote: boolean;
-  is_remote_pref: boolean;
-  keywords: string[];
-};
-
-export type EventRecommendationsResponse = {
-  ready: boolean;
-  message: string;
-  strongest_match: RankedMatch | null;
-  search_context: EventSearchContext;
-  filters: {
-    location: string | null;
-    city: string | null;
-    is_remote: boolean;
-    radius_miles: number;
-    days_ahead: number;
-    include_online: boolean;
-    max_results: number;
-  };
-  providers: EventProviderResult[];
-  recommendations: EventRecommendation[];
-  search_links: EventSearchQuery[];
-  disclaimer: string;
-};
-
-export type EventFilters = {
-  location?: string;
-  radius_miles?: number;
-  days_ahead?: number;
-  include_online?: boolean;
-  max_results?: number;
-};
-
 // ----- Meetings (people you actually met — presence tracking) -----
-
-export type Meeting = {
-  id: number;
-  job_id: number | null;
-  name: string;
-  title: string | null;
-  company: string | null;
-  where_met: string | null;
-  met_on: string | null;
-  contact_type: string | null;
-  linkedin_url: string | null;
-  note: string | null;
-  followed_up: boolean;
-  created_at: string | null;
-  // Present only on the create response.
-  momentum?: MomentumAward | null;
-};
-
-export type MeetingInput = {
-  name: string;
-  title?: string;
-  company?: string;
-  where_met?: string;
-  met_on?: string;
-  job_id?: number | null;
-  contact_type?: string;
-  linkedin_url?: string;
-  note?: string;
-};
-
-export type OutcomesResponse = {
-  supported: string[];
-  counts: Record<string, number>;
-  messages: Message[];
-};
-
-export type SeedResult = {
-  ok: boolean;
-  actions: string[];
-  total_jobs: number;
-  total_messages: number;
-};
-
-export type IngestResult = {
-  ingested: number;
-  skipped_duplicates: number;
-  parsed_rows: number;
-  total_in_db: number;
-  source: string;
-};
 
 /** Typed API error: `status` for auth handling (401 → login), `code` for
  * structured errors like plan limits ("plan_limit" → upgrade callout). */
@@ -885,47 +537,7 @@ export const api = {
     });
   },
 
-  // Jobs
-  ingestJobs: () =>
-    request<IngestResult>("/jobs/ingest/simplify", { method: "POST" }),
-  ingestNewGradJobs: (body?: {
-    categories?: string[];
-    max_per_category?: number;
-    request_delay?: number;
-  }) =>
-    request<NewGradIngestResult>("/jobs/ingest/newgrad-jobs", {
-      method: "POST",
-      body: JSON.stringify(body ?? {}),
-    }),
-  getJobs: (limit = 100) => request<Job[]>(`/jobs?limit=${limit}`),
-  getJob: (id: number) => request<Job>(`/jobs/${id}`),
-  matchJob: (id: number) =>
-    request<MatchResult>(`/jobs/${id}/match`, { method: "POST" }),
-  matchAll: () =>
-    request<{ profile_id: number; matched_jobs: number }>("/jobs/match-all", {
-      method: "POST",
-    }),
-  getRankedMatches: (limit = 25) =>
-    request<RankedMatch[]>(`/jobs/matches/ranked?limit=${limit}`),
-  getContactSearches: (id: number) =>
-    request<ContactSearch[]>(`/jobs/${id}/contact-searches`),
-  getStrategy: (id: number) =>
-    request<OutreachStrategy>(`/jobs/${id}/strategy`),
-
-  // Messages
-  generateMessages: (
-    job_id: number,
-    contact_name?: string,
-    contact_title?: string
-  ) =>
-    request<Message[]>("/messages/generate", {
-      method: "POST",
-      body: JSON.stringify({
-        job_id,
-        contact_name: contact_name || null,
-        contact_title: contact_title || null,
-      }),
-    }),
+  // Messages (pipeline workflow — drafts are created by the /outreach copilot)
   getMessages: () => request<Message[]>("/messages"),
   patchMessage: (id: number, draft_text: string) =>
     request<Message>(`/messages/${id}`, {
@@ -949,51 +561,6 @@ export const api = {
     request<Message>(`/messages/${id}/follow-up`, {
       method: "POST",
       body: JSON.stringify({ status, due_date: due_date ?? null }),
-    }),
-
-  // Insights / dashboard
-  getStats: () => request<DashboardStats>("/stats"),
-  getOutcomes: () => request<OutcomesResponse>("/outcomes"),
-  getMission: () => request<Mission>("/dashboard/mission"),
-
-  // Event / conference networking recommendations (provider APIs + manual
-  // search links; never invents events, never registers or emails anyone)
-  getEventRecommendations: (filters: EventFilters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.location) params.set("location", filters.location);
-    if (filters.radius_miles != null)
-      params.set("radius_miles", String(filters.radius_miles));
-    if (filters.days_ahead != null)
-      params.set("days_ahead", String(filters.days_ahead));
-    if (filters.include_online != null)
-      params.set("include_online", String(filters.include_online));
-    if (filters.max_results != null)
-      params.set("max_results", String(filters.max_results));
-    const qs = params.toString();
-    return request<EventRecommendationsResponse>(
-      `/events/recommendations${qs ? `?${qs}` : ""}`
-    );
-  },
-
-  // Momentum (Vibe Mode gamification)
-  getMomentum: () => request<MomentumSummary>("/momentum/summary"),
-
-  // Meetings (log people you actually met; powers the presence funnel)
-  getMeetings: (jobId?: number) =>
-    request<Meeting[]>(`/meetings${jobId != null ? `?job_id=${jobId}` : ""}`),
-  logMeeting: (input: MeetingInput) =>
-    request<Meeting>("/meetings", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-  updateMeeting: (id: number, patch: { followed_up?: boolean; note?: string }) =>
-    request<Meeting>(`/meetings/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    }),
-  deleteMeeting: (id: number) =>
-    request<{ status: string; id: number }>(`/meetings/${id}`, {
-      method: "DELETE",
     }),
 
   // Next Move AI (analyze a pasted reply; never auto-reads anything)
@@ -1128,5 +695,4 @@ export const api = {
     }),
 
   // Demo
-  seedDemo: () => request<SeedResult>("/demo/seed", { method: "POST" }),
 };

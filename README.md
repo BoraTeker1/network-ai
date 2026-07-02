@@ -14,8 +14,7 @@ Turkish/English outreach, and (5) track manual follow-up. It works like Cursor:
 It is **not** a U.S. new-grad platform, **not** "Kariyer.net with AI," and **not**
 a generic global job board — it's a narrow workflow tool for the Turkey →
 remote/EU job hunt. The default journey starts at **`/opportunities`** and flows
-into **`/outreach`**. (A legacy U.S. new-grad matching layer still exists in the
-codebase but is off the primary navigation.)
+into **`/outreach`**.
 
 A narrative version lives at **`/pitch`** in the running app.
 
@@ -120,7 +119,7 @@ features degrade gracefully when blank.
 ### Accounts, plans & privacy (beta)
 
 The app now has real **email+password accounts** (scrypt-hashed, HttpOnly
-session cookies). Each user's profile, drafts, pipeline, contacts, and momentum
+session cookies). Each user's profile, drafts, pipeline, and contacts
 are **private to their account**; the opportunity feed and pricing page are
 public. Free accounts have daily gate limits (drafts, Next Move analyses,
 pipeline items); **Pro** removes them. Payments are **not live** in the beta —
@@ -161,53 +160,6 @@ product features, not limitations:
 
 ---
 
-## Vibe Mode
-
-Networking outreach is boring and stressful, so **Vibe Mode** (`/vibe`, also on
-the dashboard) turns it into a focused **25-minute sprint**: pick a mood, start
-the timer, and work a short checklist (review strong matches → approve drafts →
-copy/manual-send → update outcomes) with music playing alongside.
-
-- **No hosted audio.** Network AI does **not** host or serve any music files.
-- **Third-party embeds only.** Each mood loads a Spotify / SoundCloud / YouTube
-  **embedded player** (iframe). The default playlists are curated, swappable
-  defaults — change a mood's `embedUrl` in `frontend/lib/vibe.ts`.
-- **No autoplay.** Music never starts on its own; the embedded player requires
-  you to press play.
-- **Same rules.** Vibe Mode only changes pacing and atmosphere — the philosophy
-  is unchanged: no scraping, no auto-send, no bulk sending, manual approval only.
-
-### Momentum (gamification)
-
-**Momentum** is a tasteful points layer that rewards *quality* networking
-progress — never volume or spam. You earn points only for milestones you
-confirm by hand:
-
-| Action | Momentum |
-| --- | --- |
-| Draft approved | +5 |
-| Marked ready to send (copied) | +5 |
-| Sent manually | +10 |
-| Follow-up completed | +10 |
-| Reply received | +25 |
-| Referral received | +50 |
-| Interview received | +100 |
-| Ignored / rejected | +0 (logged, no shame) |
-
-- A **"Today's Momentum"** card on the dashboard shows points today, total
-  points, your day streak, and recent wins.
-- Marking an outcome shows a short celebration toast (bigger for an interview)
-  and an **optional** chime synthesized with the Web Audio API — **no
-  copyrighted or hosted audio, no autoplay** (sounds only play from your click),
-  with a **mute toggle** persisted in `localStorage`.
-- Points are stored in a `momentum_events` table and **awarded once** per
-  milestone, so clicking the same outcome twice never double-counts.
-- By design, Momentum rewards quality, not quantity: **no scraping, no
-  auto-send, no bulk sending, and replies are never auto-detected** — every
-  outcome is tracked manually.
-
----
-
 ## Next Move AI
 
 Outreach doesn't end when you hit send — the hard part is knowing what to do
@@ -225,7 +177,7 @@ staying strictly permission-based:
   **email** and **short-message** styles — each with a quality + safety checklist.
 - You review and edit the draft, **copy** it, and send it yourself. If you linked
   a pipeline item, one click logs the outcome (replied / referral received /
-  interview received) and awards **Momentum** once (no double-counting).
+  interview received).
 - Guardrails are unchanged: no scraping, no browser automation, no auto-reading
   of messages, no Gmail sending, no auto-send. AI proposes; you approve and send.
 
@@ -272,10 +224,9 @@ it serves **real listings only** — no fake/sample data.
 | --------- | ----------------------------------------------------- |
 | Backend   | FastAPI, SQLAlchemy, SQLite, Pydantic (Python 3.11+)  |
 | Frontend  | Next.js 14 (App Router), React 18, TypeScript, Tailwind |
-| Matching  | Deterministic keyword scoring (no LLM)                |
-| Messaging | Claude (Anthropic) drafting + deterministic checklist |
+| Drafting  | Claude (Anthropic) drafting + deterministic checklist |
 
-Matching is deterministic and offline. Message/email/outreach **drafting** uses
+Outreach **drafting** uses
 the **Claude Messages API** when `ANTHROPIC_API_KEY` is set, and falls back to
 deterministic templates otherwise — so every AI feature degrades gracefully with
 no key. The `llm_used` flag on each draft tells you which path produced it.
@@ -330,22 +281,17 @@ cd backend
 ## Demo flow
 
 1. Start the backend and frontend (commands above).
-2. Open **http://localhost:3000**.
-3. Click **Load demo data** on the dashboard (seeds a profile, jobs, matches,
-   and drafts instantly) — or do it manually:
-   - **Profile** → paste a resume → *Save Profile*.
-   - **Jobs** → *Ingest Latest New Grad Jobs*.
-   - **Matches** → *Match All Jobs*.
-4. Open a top match → read the **Next Best Action** and **Outreach Strategy**,
-   then **Generate Outreach Drafts** (4 message types, each tone-labeled).
-5. **Messages** → review each draft against its quality checklist, edit,
-   *Approve*, *Copy*, then *Mark Sent Manually*.
-6. After you reach out, mark the real **outcome** (replied, interview, etc.) and
-   set a **follow-up** reminder if needed.
-7. **Pipeline** → watch contacts flow across the CRM board, follow-ups-due band,
-   and outcomes band.
-8. **Dashboard** → see "Today's networking plan" and "Your networking funnel"
-   update from your local data. Open **`/pitch`** for the narrative.
+2. Open **http://localhost:3000** and sign up / log in.
+3. **Profile** → upload or paste a resume → *Save Profile*.
+4. **Opportunities** → *Refresh live sources* (official ATS + public job APIs),
+   then filter by level / field / Turkey-applicability.
+5. Pick a role → **Draft outreach** (prefills the copilot) → review the
+   bilingual TR/EN draft against its quality checklist, edit, and save it to
+   the pipeline. Copy and send it yourself.
+6. **Pipeline** → mark sent, log the real **outcome** (replied, interview, …),
+   and set a **follow-up** reminder.
+7. When someone replies, paste the reply into **Next Move** for a suggested
+   response and a one-click pipeline update. Open **`/pitch`** for the narrative.
 
 ---
 
@@ -363,23 +309,14 @@ cd backend
 | POST   | `/opportunities/import`                | Manual JSON import (no scraping)     |
 | POST   | `/outreach/draft-from-paste`           | Paste-a-JD bilingual outreach draft  |
 
-**Legacy (U.S. new-grad layer, off primary nav):**
+**Supporting endpoints:**
 
 | Method | Path                                   | Purpose                              |
 | ------ | -------------------------------------- | ------------------------------------ |
 | GET    | `/health`                              | Health check                         |
 | POST   | `/profile/resume-text`                 | Save/replace resume, extract profile |
 | GET    | `/profile`                             | Get the saved profile                |
-| POST   | `/jobs/ingest/simplify`                | Ingest SimplifyJobs new-grad roles   |
-| GET    | `/jobs`                                | List jobs                            |
-| GET    | `/jobs/{id}`                           | Job detail                           |
-| GET    | `/jobs/{id}/contact-searches`          | Manual contact search links          |
-| GET    | `/jobs/{id}/strategy`                  | Deterministic outreach strategy      |
-| POST   | `/jobs/match-all`                      | Rank all jobs vs. profile            |
-| POST   | `/jobs/{id}/match`                     | Rank a single job                    |
-| GET    | `/jobs/matches/ranked`                 | Ranked matches (with breakdown)      |
-| POST   | `/messages/generate`                   | Generate 4 draft variants for a job  |
-| GET    | `/messages`                            | List drafts (with quality checklist) |
+| GET    | `/messages`                            | Pipeline drafts (with quality checklist) |
 | PATCH  | `/messages/{id}`                       | Edit a draft                         |
 | POST   | `/messages/{id}/approve`               | Approve a draft                      |
 | POST   | `/messages/{id}/reject`                | Reject a draft                       |
@@ -387,9 +324,6 @@ cd backend
 | POST   | `/messages/{id}/mark-sent-manually`    | Mark manually sent                   |
 | POST   | `/messages/{id}/outcome`               | Record a real-world outcome          |
 | POST   | `/messages/{id}/follow-up`             | Set/clear follow-up state + due date |
-| GET    | `/outcomes`                            | Outcome counts + reported messages   |
-| GET    | `/stats`                               | Dashboard aggregates + funnel        |
-| POST   | `/demo/seed`                           | Seed demo data (offline, idempotent) |
 | GET/POST | `/goals`                             | List / create job-search goal        |
 | PATCH/DELETE | `/goals/{id}`                    | Update / delete a goal               |
 | POST   | `/contacts/manual`                     | Add a contact manually               |
@@ -413,9 +347,8 @@ Supported outcomes: `connected`, `replied`, `referral_received`,
 
 _Add screenshots here:_
 
-- `docs/dashboard.png` — Dashboard with stats, top matches, recent drafts
-- `docs/matches.png` — Ranked matches with score breakdown
-- `docs/messages.png` — Drafts with quality checklist + outcome tracking
+- `docs/opportunities.png` — Turkey + remote/EU feed with applicability labels
+- `docs/outreach.png` — Bilingual outreach copilot with quality checklist
 - `docs/pipeline.png` — Networking pipeline CRM board
 
 ---
@@ -423,17 +356,15 @@ _Add screenshots here:_
 ## AI email copilot — demo flow
 
 1. **Profile** → upload/paste a resume.
-2. **Goals** → create a goal, e.g. "Backend/AI engineer role in NYC or remote",
+2. **Goals** → create a goal, e.g. "Backend engineer, remote/EU",
    outreach goal = advice.
-3. **Jobs** → ingest, then **Matches** → match all.
-4. Open a **Strong Target** → review the outreach strategy.
-5. In **Contacts & AI Email Outreach**: add a recruiter/engineer contact (or run
-   discovery — without provider keys it shows the "not configured" message and
-   your manual contacts).
-6. Click **Draft Email**. If `OPENAI_API_KEY` is set the body is written by the
-   OpenAI Responses API (`llm_used: true`); otherwise it's a deterministic
-   template (`llm_used: false`).
-7. Review the **why this contact**, **quality checklist**, and **risk
+3. **Opportunities** → refresh live sources and pick a strong-fit role.
+4. Add a recruiter/engineer contact (or run discovery — without provider keys it
+   shows the "not configured" message and your manual contacts).
+5. Draft the outreach. If an LLM key is set the body is written by Claude
+   (`llm_used: true`); otherwise it's a deterministic template
+   (`llm_used: false`).
+6. Review the **why this contact**, **quality checklist**, and **risk
    checklist**; edit; **Approve**; **Copy Email** or **Mark Sent Manually**.
 8. Track the **outcome** and **follow-up** on the draft. (Gmail send stays
    disabled.)
@@ -456,7 +387,6 @@ _Add screenshots here:_
 - Implement compliant provider discovery (Hunter / PDL) behind keys.
 - Safe Gmail OAuth send (approved + explicit confirm only), still no bulk.
 - Richer resume parsing (education, target roles, seniority).
-- Job descriptions for deeper match scoring beyond the title.
 - Export pipeline to CSV; weekly networking digest.
 - Multi-user support with auth (out of scope for this MVP).
 

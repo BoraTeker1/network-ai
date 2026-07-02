@@ -15,7 +15,8 @@ from ..db import get_db
 from ..deps import require_user
 from ..models import Contact, EmailDraft, Goal, Job, User
 from ..schemas import LinkedInDraftIn
-from ..services import linkedin_generator, matcher, plans
+from ..services import linkedin_generator, plans
+from ..services.profiles import get_profile, profile_skills
 from ..services.rate_limit import rate_limit
 from .emails import _serialize
 
@@ -56,8 +57,8 @@ def draft_linkedin(
         else None
     )
 
-    profile = matcher.get_profile(db, user.id)
-    skills = matcher._profile_skills(profile) if profile else []
+    profile = get_profile(db, user.id)
+    skills = profile_skills(profile)
     summary = profile.experience_summary if profile else None
 
     goal_dict = {

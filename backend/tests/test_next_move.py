@@ -1,8 +1,7 @@
-"""Next Move AI tests: intent detection, fallback, suggested update, momentum."""
+"""Next Move AI tests: intent detection, fallback, suggested pipeline update."""
 
 import pytest
 
-from app.models import Job
 from app.services import llm_client, next_move
 
 
@@ -86,22 +85,7 @@ def test_suggested_pipeline_update(text, outcome):
     assert r["suggested_pipeline_update"] == outcome
 
 
-def test_momentum_preview_matches_outcome():
-    r = next_move.analyze_reply(
-        reply_text="Are you free for a call this week?", context={}
-    )
-    assert r["suggested_momentum"]["event_type"] == "interview_received"
-    assert r["suggested_momentum"]["points"] == 100
-
-
-def test_negative_preview_is_zero_points():
-    r = next_move.analyze_reply(
-        reply_text="Unfortunately the position is filled.", context={}
-    )
-    assert r["suggested_momentum"]["points"] == 0  # tracked, no shame
-
-
-# ----- API endpoint + Momentum integration -----
+# ----- API endpoint integration -----
 
 def _profile(client):
     client.post("/profile/resume-text", json={
@@ -110,15 +94,13 @@ def _profile(client):
 
 
 def _seed_message(client, db_session):
-    job = Job(source="test", external_id="nm1", company="Acme",
-              title="Backend Engineer", location="Remote",
-              url="https://example.com/apply")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
     _profile(client)
-    drafts = client.post("/messages/generate", json={"job_id": job.id}).json()
-    return drafts[0]["id"]
+    saved = client.post("/outreach/save-draft", json={
+        "body": "Hi — I'd love to connect about the Backend Engineer role at Acme.",
+        "company": "Acme", "role": "Backend Engineer",
+        "channel": "email", "language": "en",
+    }).json()
+    return saved["id"]
 
 
 def test_analyze_endpoint_rejects_empty(client):
@@ -137,18 +119,14 @@ def test_analyze_endpoint_links_pipeline_target(client, db_session):
     assert a["drafted_email"]["body"]  # context flows into the draft
 
 
-def test_outcome_confirmation_awards_momentum_once(client, db_session):
+def test_outcome_confirmation_updates_pipeline(client, db_session):
     mid = _seed_message(client, db_session)
     client.post(
         "/next-move/analyze",
         json={"reply_text": "Are you free for a call this week?", "message_id": mid},
     )
-    # Confirming the suggested outcome reuses the existing endpoint + Momentum.
+    # Confirming the suggested outcome reuses the existing messages endpoint.
     res = client.post(
         f"/messages/{mid}/outcome", json={"outcome": "interview_received"}
     ).json()
-    assert res["momentum"]["points"] == 100
-    again = client.post(
-        f"/messages/{mid}/outcome", json={"outcome": "interview_received"}
-    ).json()
-    assert again["momentum"] is None  # no double-count
+    assert res["outcome"] == "interview_received"

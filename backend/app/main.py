@@ -17,17 +17,10 @@ from .routers import (
     auth,
     billing,
     contacts,
-    dashboard,
-    demo,
     emails,
-    events,
     goals,
-    insights,
-    jobs,
     linkedin,
-    meetings,
     messages,
-    momentum,
     next_move,
     opportunities,
     outreach,
@@ -77,21 +70,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(profile.router)
-app.include_router(jobs.router)
 app.include_router(messages.router)
-app.include_router(insights.router)
-app.include_router(demo.router)
 app.include_router(goals.router)
 app.include_router(contacts.router)
 app.include_router(emails.router)
 app.include_router(linkedin.router)
-app.include_router(momentum.router)
 app.include_router(next_move.router)
 app.include_router(outreach.router)
 app.include_router(opportunities.router)
-app.include_router(dashboard.router)
-app.include_router(events.router)
-app.include_router(meetings.router)
 
 
 @app.get("/health")

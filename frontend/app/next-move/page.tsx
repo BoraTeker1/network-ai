@@ -17,7 +17,6 @@ import {
   TrustLine,
   WorkflowHint,
 } from "@/components/ui";
-import { useMomentum } from "@/components/MomentumProvider";
 
 const INTENT_STYLE: Record<string, string> = {
   positive: "bg-green-100 text-green-800",
@@ -47,7 +46,6 @@ function label(s: string): string {
 }
 
 export default function NextMovePage() {
-  const { celebrate } = useMomentum();
 
   const [replyText, setReplyText] = useState("");
   const [linkedKey, setLinkedKey] = useState(""); // "message:12" | "email:3" | ""
@@ -142,11 +140,8 @@ export default function NextMovePage() {
     setBusyOutcome(true);
     setError(null);
     try {
-      const updated =
-        target.type === "message"
-          ? await api.setOutcome(target.id, outcome)
-          : await api.patchEmail(target.id, { outcome });
-      celebrate(updated.momentum);
+      if (target.type === "message") await api.setOutcome(target.id, outcome);
+      else await api.patchEmail(target.id, { outcome });
       setNotice(`Pipeline updated → ${label(outcome)}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update outcome");
@@ -186,7 +181,7 @@ export default function NextMovePage() {
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div className="min-w-0">
             <label className="text-xs font-medium text-slate-500">
-              Link a pipeline item (optional — enables outcome + Momentum)
+              Link a pipeline item (optional — enables outcome logging)
             </label>
             {linkOptions.length === 0 ? (
               <p className="mt-1 w-72 max-w-full rounded-md border border-dashed border-slate-300 px-2 py-2 text-xs text-slate-500">
@@ -345,7 +340,7 @@ export default function NextMovePage() {
             </div>
           </section>
 
-          {/* Log outcome + Momentum */}
+          {/* Log outcome */}
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -357,17 +352,14 @@ export default function NextMovePage() {
                   <span className="font-medium text-slate-700">
                     {label(analysis.suggested_pipeline_update)}
                   </span>
-                  {analysis.suggested_momentum
-                    ? ` · Momentum +${analysis.suggested_momentum.points}`
-                    : ""}
                 </span>
               )}
             </div>
 
             {!canLogOutcome ? (
               <p className="mt-2 text-sm text-slate-500">
-                Link a pipeline item above (a message or email) to log the outcome
-                and earn Momentum. Without a linked item you can still copy and send
+                Link a pipeline item above (a message or email) to log the outcome.
+                Without a linked item you can still copy and send
                 the draft manually.
               </p>
             ) : (
@@ -393,9 +385,8 @@ export default function NextMovePage() {
               </div>
             )}
             <p className="mt-3 text-xs text-slate-400">
-              Logging an outcome updates your pipeline and awards Momentum once —
-              re-clicking the same outcome never double-counts. Nothing is sent for
-              you; you send your reply manually.
+              Logging an outcome updates your pipeline. Nothing is sent for you;
+              you send your reply manually.
             </p>
           </section>
         </div>

@@ -18,8 +18,6 @@ const PRIMARY = [
 // Supporting surfaces — de-emphasized behind a "More" menu.
 const SECONDARY = [
   { href: "/goals", label: "Goals" },
-  { href: "/events", label: "Events" },
-  { href: "/vibe", label: "Vibe Mode" },
   { href: "/pitch", label: "Pitch" },
 ];
 
