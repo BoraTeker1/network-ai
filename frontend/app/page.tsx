@@ -155,12 +155,42 @@ function MockRoleRow({
   );
 }
 
-/** Static mini-dashboard: roles → draft → pipeline in one glance. */
+/** Pipeline stage chip for the mockup's tracker strip. */
+function MockStage({
+  label,
+  count,
+  active = false,
+}: {
+  label: string;
+  count: number;
+  active?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-1 flex-col items-center rounded-lg border px-2 py-1.5 ${
+        active
+          ? "border-blue-600 bg-blue-50/70"
+          : "border-slate-200 bg-white"
+      }`}
+    >
+      <span
+        className={`text-sm font-bold ${active ? "text-blue-700" : "text-slate-700"}`}
+      >
+        {count}
+      </span>
+      <span className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/** Static mini-dashboard: stages → roles → draft in one glance. */
 function ProductMockup() {
   return (
     <div aria-hidden className="relative select-none" role="presentation">
       {/* soft glow behind the card */}
-      <div className="absolute -inset-4 -z-10 rounded-[28px] bg-blue-100/50 blur-2xl" />
+      <div className="absolute -inset-4 -z-10 rounded-[28px] bg-white/70 blur-2xl" />
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         {/* window chrome */}
         <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
@@ -172,7 +202,16 @@ function ProductMockup() {
           </span>
         </div>
 
-        <div className="space-y-3 p-4">
+        <div className="space-y-3 p-4 pb-8">
+          {/* pipeline stage tracker */}
+          <div className="flex items-center gap-1.5">
+            <MockStage label="Taslak" count={4} />
+            <span className="text-slate-300">→</span>
+            <MockStage label="Gönderildi" count={3} active />
+            <span className="text-slate-300">→</span>
+            <MockStage label="Cevap" count={1} />
+          </div>
+
           {/* today's opportunities */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
@@ -218,21 +257,32 @@ function ProductMockup() {
             </p>
           </div>
 
-          {/* mini pipeline */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
-            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">
-              ✓ Taslak hazır
-            </span>
-            <span className="text-slate-300">→</span>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
-              Gönderildi
-            </span>
-            <span className="text-slate-300">→</span>
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
-              Cevap bekleniyor
-            </span>
-          </div>
         </div>
+      </div>
+
+      {/* popped-out row with cursor — the reply just came in */}
+      <div className="absolute -bottom-4 -left-3 right-8 sm:-left-8">
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg">
+          <div className="min-w-0">
+            <div className="truncate text-[12px] font-medium text-slate-800">
+              Junior Software Engineer
+            </div>
+            <div className="text-[10px] text-slate-500">
+              Cevap geldi · Next Move önerisi hazır
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
+            Cevap ✓
+          </span>
+        </div>
+        {/* cursor arrow */}
+        <svg
+          viewBox="0 0 24 24"
+          className="absolute -bottom-2.5 right-10 h-5 w-5 text-slate-700 drop-shadow"
+          fill="currentColor"
+        >
+          <path d="M5 3l14 8-6.5 1.5L9 19z" />
+        </svg>
       </div>
     </div>
   );
@@ -263,37 +313,44 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-16 pb-10">
-      {/* Hero — copy left, product mockup right */}
-      <section className="grid items-center gap-10 pt-4 sm:pt-8 lg:grid-cols-[1fr_minmax(0,26rem)]">
-        <div>
-          <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-            Ücretsiz erken beta
-          </span>
-          <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl">
-            Türkiye’den global iş aramayı daha düzenli hale getir
-          </h1>
-          <p className="mt-4 max-w-xl text-slate-600">
-            NetworkAI; Türkiye, remote ve Avrupa’daki gerçekçi rolleri bulmana,
-            dürüst outreach mesajları hazırlamana ve başvurularını tek yerde
-            takip etmene yardımcı olur.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <PrimaryCta>Ücretsiz başla</PrimaryCta>
-            <SecondaryCta>Giriş yap</SecondaryCta>
-            <Link
-              href="/opportunities"
-              className="text-sm font-medium text-blue-600 hover:underline"
-            >
-              Fırsatları gör →
-            </Link>
+    <div className="mx-auto max-w-5xl space-y-16 overflow-x-clip pb-10">
+      {/* Hero — full-bleed soft blue band; copy left, product mockup right */}
+      <section className="relative left-1/2 -mx-[50vw] -mt-8 w-screen border-b border-blue-100 bg-blue-50/70">
+        <div className="mx-auto grid max-w-5xl items-center gap-10 px-6 py-12 sm:py-16 lg:grid-cols-[1fr_minmax(0,26rem)]">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
+                Ücretsiz erken beta
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                Türkiye → Remote/EU outreach copilotu
+              </span>
+            </div>
+            <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
+              Türkiye’den global iş aramayı daha düzenli hale getir
+            </h1>
+            <p className="mt-4 max-w-xl text-slate-600">
+              NetworkAI; Türkiye, remote ve Avrupa’daki gerçekçi rolleri
+              bulmana, dürüst outreach mesajları hazırlamana ve başvurularını
+              tek yerde takip etmene yardımcı olur.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <PrimaryCta>Ücretsiz başla</PrimaryCta>
+              <SecondaryCta>Giriş yap</SecondaryCta>
+              <Link
+                href="/opportunities"
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Fırsatları gör →
+              </Link>
+            </div>
+            <p className="mt-4 text-xs text-slate-500">
+              Otomatik başvuru yok. Spam yok. Mesajları sen inceler, sen
+              gönderirsin.
+            </p>
           </div>
-          <p className="mt-4 text-xs text-slate-500">
-            Otomatik başvuru yok. Spam yok. Mesajları sen inceler, sen
-            gönderirsin.
-          </p>
+          <ProductMockup />
         </div>
-        <ProductMockup />
       </section>
 
       {/* Social proof (honest — no fake numbers) */}
