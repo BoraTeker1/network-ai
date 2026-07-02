@@ -21,7 +21,7 @@ from ..models import (
     Contact,
     EmailDraft,
     Goal,
-    Job,
+    Opportunity,
     User,
 )
 from ..schemas import EmailDraftIn, EmailPatchIn, GmailSendIn
@@ -39,18 +39,28 @@ def _loads(blob: str | None) -> dict:
         return {}
 
 
+def _draft_role_context(e: EmailDraft) -> tuple[str | None, str | None]:
+    """(company, role) from the linked opportunity, falling back to a legacy Job."""
+    if e.opportunity:
+        return e.opportunity.company, e.opportunity.title
+    if e.job:
+        return e.job.company, e.job.title
+    return None, None
+
+
 def _serialize(e: EmailDraft, db: Session) -> dict:
     contact = e.contact
-    job = e.job
+    company, role = _draft_role_context(e)
     quality = _loads(e.quality_checklist)
     risk = _loads(e.risk_checklist)
     return {
         "id": e.id,
+        "opportunity_id": e.opportunity_id,
         "job_id": e.job_id,
         "contact_id": e.contact_id,
         "goal_id": e.goal_id,
-        "company": job.company if job else None,
-        "role": job.title if job else None,
+        "company": company,
+        "role": role,
         "contact_name": contact.name if contact else None,
         "contact_title": contact.title if contact else None,
         "contact_email": contact.email if contact else None,
@@ -97,9 +107,11 @@ def draft_email(
     user: User = Depends(plans.enforce_limit("email_draft")),
 ):
     """Generate and store an email draft (LLM when configured, else template)."""
-    job = db.query(Job).filter(Job.id == payload.job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
+    opp = db.query(Opportunity).filter(Opportunity.id == payload.opportunity_id).first()
+    if opp is None:
+        raise HTTPException(
+            status_code=404, detail=f"Opportunity {payload.opportunity_id} not found"
+        )
     contact = (
         db.query(Contact)
         .filter(Contact.id == payload.contact_id, Contact.user_id == user.id)
@@ -127,7 +139,7 @@ def draft_email(
         "outreach_goal": goal.outreach_goal if goal else None,
         "tone_preference": goal.tone_preference if goal else None,
     }
-    job_dict = {"company": job.company, "title": job.title, "location": job.location}
+    job_dict = {"company": opp.company, "title": opp.title, "location": opp.location}
     contact_dict = {
         "name": contact.name,
         "title": contact.title,
@@ -147,7 +159,7 @@ def draft_email(
 
     draft = EmailDraft(
         user_id=user.id,
-        job_id=job.id,
+        opportunity_id=opp.id,
         contact_id=contact.id,
         goal_id=goal.id if goal else None,
         subject=result["subject"],
@@ -197,11 +209,12 @@ def patch_email(email_id: int, payload: EmailPatchIn, db: Session = Depends(get_
         e.body = payload.body
     if payload.subject is not None or payload.body is not None:
         skills = profile_skills(get_profile(db, user.id))
+        company, role = _draft_role_context(e)
         quality = email_generator.quality_checklist(
             subject=e.subject,
             body=e.body,
-            company=e.job.company if e.job else None,
-            role=e.job.title if e.job else None,
+            company=company,
+            role=role,
             profile_skills=skills,
         )
         e.quality_checklist = json.dumps(quality)

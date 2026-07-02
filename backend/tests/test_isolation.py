@@ -5,7 +5,7 @@ same in-memory DB). Foreign IDs must return 404 — never 403 (don't leak
 existence), never 200.
 """
 
-from app.models import Job
+from app.models import Opportunity
 
 
 def _save_outreach(c, company="Acme Cloud"):
@@ -85,18 +85,17 @@ def test_next_move_cannot_link_foreign_message(client, client_b):
 
 
 def test_emails_are_isolated(client, client_b, db_session):
-    # Seed A a job + contact, then draft an email as A.
-    job = Job(source="test", external_id="iso1", company="Acme",
-              title="Backend Engineer", location="Remote")
-    db_session.add(job)
+    # Seed an opportunity + a contact for A, then draft an email as A.
+    opp = Opportunity(source="test", external_id="iso1", company="Acme",
+                      title="Backend Engineer", location="Remote")
+    db_session.add(opp)
     db_session.commit()
-    db_session.refresh(job)
-    job_id = job.id
+    db_session.refresh(opp)
     contact = client.post(
-        "/contacts/manual", json={"name": "Sam Lee", "job_id": job_id}
+        "/contacts/manual", json={"name": "Sam Lee", "company": "Acme"}
     ).json()
     email = client.post(
-        "/emails/draft", json={"job_id": job_id, "contact_id": contact["id"]}
+        "/emails/draft", json={"opportunity_id": opp.id, "contact_id": contact["id"]}
     ).json()
 
     assert client_b.get("/emails").json() == []
@@ -104,6 +103,6 @@ def test_emails_are_isolated(client, client_b, db_session):
     assert client_b.post(f"/emails/{email['id']}/approve").status_code == 404
     # B also can't draft against A's contact (ownership check on contact).
     r = client_b.post(
-        "/emails/draft", json={"job_id": job_id, "contact_id": contact["id"]}
+        "/emails/draft", json={"opportunity_id": opp.id, "contact_id": contact["id"]}
     )
     assert r.status_code == 404

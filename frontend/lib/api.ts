@@ -361,7 +361,8 @@ export type DiscoverResponse = {
 
 export type EmailDraft = {
   id: number;
-  job_id: number | null;
+  opportunity_id: number | null;
+  job_id: number | null; // legacy rows only
   contact_id: number | null;
   goal_id: number | null;
   company: string | null;
@@ -642,7 +643,7 @@ export const api = {
 
   // Emails (AI draft + approval queue; never auto-sends)
   draftEmail: (input: {
-    job_id: number;
+    opportunity_id: number;
     contact_id: number;
     goal_id?: number | null;
     tone?: string;
@@ -654,7 +655,7 @@ export const api = {
   // LinkedIn drafts (connection note / post-accept DM). Stored as EmailDraft
   // rows, so they reuse every /emails approval + tracking action below.
   draftLinkedIn: (input: {
-    job_id: number;
+    opportunity_id: number;
     contact_id: number;
     goal_id?: number | null;
     kind?: "connection" | "dm";

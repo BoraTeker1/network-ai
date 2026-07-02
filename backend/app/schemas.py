@@ -122,7 +122,7 @@ class DiscoverIn(BaseModel):
 # ----- Emails -----
 
 class EmailDraftIn(BaseModel):
-    job_id: int
+    opportunity_id: int
     contact_id: int
     goal_id: Optional[int] = None
     tone: Optional[str] = "warm_low_pressure"
@@ -143,7 +143,7 @@ class GmailSendIn(BaseModel):
 # ----- LinkedIn -----
 
 class LinkedInDraftIn(BaseModel):
-    job_id: int
+    opportunity_id: int
     contact_id: int
     goal_id: Optional[int] = None
     kind: str = "connection"          # "connection" (300-char note) | "dm"

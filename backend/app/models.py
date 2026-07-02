@@ -284,6 +284,8 @@ class EmailDraft(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
+    # New drafts link to a curated Opportunity; job_id survives only for legacy rows.
+    opportunity_id = Column(Integer, ForeignKey("opportunities.id"), index=True, nullable=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True, nullable=True)
     contact_id = Column(Integer, ForeignKey("contacts.id"), index=True, nullable=True)
     goal_id = Column(Integer, ForeignKey("goals.id"), index=True, nullable=True)
@@ -305,6 +307,7 @@ class EmailDraft(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    opportunity = relationship("Opportunity")
     job = relationship("Job")
     contact = relationship("Contact")
     goal = relationship("Goal")

@@ -72,7 +72,7 @@ networking* — works fully offline and is provable, not promised.
 ## AI email copilot (permission-based)
 
 Network AI can draft personalized outreach **emails** using your resume, your
-job-search goal, the selected job, and a contact you added — then route them
+job-search goal, the selected opportunity, and a contact you added — then route them
 through an approval queue. It is a copilot, never an autopilot:
 
 - **AI proposes, you approve.** Drafts land in `/emails` as proposed actions

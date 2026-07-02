@@ -43,8 +43,10 @@ def analyze(
         if msg is None:
             raise HTTPException(status_code=404, detail="Linked message not found")
         pipeline_target = {"type": "message", "id": msg.id}
-        if msg.job:
-            company, role = msg.job.company, msg.job.title
+        # Outreach-copilot messages store company/title directly; legacy rows
+        # fall back to the linked Job.
+        company = msg.company or (msg.job.company if msg.job else None)
+        role = msg.title or (msg.job.title if msg.job else None)
     elif payload.email_id is not None:
         email = (
             db.query(EmailDraft)
@@ -54,7 +56,9 @@ def analyze(
         if email is None:
             raise HTTPException(status_code=404, detail="Linked email not found")
         pipeline_target = {"type": "email", "id": email.id}
-        if email.job:
+        if email.opportunity:
+            company, role = email.opportunity.company, email.opportunity.title
+        elif email.job:
             company, role = email.job.company, email.job.title
         if email.contact:
             contact_name, contact_title = email.contact.name, email.contact.title

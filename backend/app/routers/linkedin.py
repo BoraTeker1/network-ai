@@ -2,7 +2,7 @@
 
 Generates a LinkedIn connection note (300-char cap) or a post-accept DM, stored
 as an EmailDraft row so the entire review → approve → copy → mark-sent-manual
-workflow (and Momentum) in the /emails router is reused unchanged. Nothing is
+workflow in the /emails router is reused unchanged. Nothing is
 ever auto-sent — copy/paste into LinkedIn yourself is the only ToS-safe path.
 """
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_user
-from ..models import Contact, EmailDraft, Goal, Job, User
+from ..models import Contact, EmailDraft, Goal, Opportunity, User
 from ..schemas import LinkedInDraftIn
 from ..services import linkedin_generator, plans
 from ..services.profiles import get_profile, profile_skills
@@ -37,9 +37,11 @@ def draft_linkedin(
             detail=f"kind must be one of: {', '.join(linkedin_generator.VALID_KINDS)}",
         )
 
-    job = db.query(Job).filter(Job.id == payload.job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
+    opp = db.query(Opportunity).filter(Opportunity.id == payload.opportunity_id).first()
+    if opp is None:
+        raise HTTPException(
+            status_code=404, detail=f"Opportunity {payload.opportunity_id} not found"
+        )
     contact = (
         db.query(Contact)
         .filter(Contact.id == payload.contact_id, Contact.user_id == user.id)
@@ -66,7 +68,7 @@ def draft_linkedin(
         "outreach_goal": goal.outreach_goal if goal else None,
         "tone_preference": goal.tone_preference if goal else None,
     }
-    job_dict = {"company": job.company, "title": job.title, "location": job.location}
+    job_dict = {"company": opp.company, "title": opp.title, "location": opp.location}
     contact_dict = {
         "name": contact.name,
         "title": contact.title,
@@ -87,7 +89,7 @@ def draft_linkedin(
 
     draft = EmailDraft(
         user_id=user.id,
-        job_id=job.id,
+        opportunity_id=opp.id,
         contact_id=contact.id,
         goal_id=goal.id if goal else None,
         subject=result["subject"],          # None for LinkedIn

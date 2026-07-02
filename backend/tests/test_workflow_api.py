@@ -7,21 +7,21 @@ The LLM is forced unavailable so email drafting uses the deterministic template
 
 import pytest
 
-from app.models import Job
+from app.models import Opportunity
 from app.services import llm_client
 
 
 @pytest.fixture
-def seeded_job(db_session):
-    job = Job(
+def seeded_opportunity(db_session):
+    opp = Opportunity(
         source="test", external_id="t1",
         company="Acme", title="Software Engineer, New Grad", location="Remote",
         url="https://example.com/apply",
     )
-    db_session.add(job)
+    db_session.add(opp)
     db_session.commit()
-    db_session.refresh(job)
-    return job
+    db_session.refresh(opp)
+    return opp
 
 
 def _save_profile(client):
@@ -62,16 +62,15 @@ def test_message_approval_and_outcome_flow(client):
     assert bad.status_code == 400
 
 
-def test_email_draft_fallback_and_disabled_gmail(client, seeded_job, monkeypatch):
+def test_email_draft_fallback_and_disabled_gmail(client, seeded_opportunity, monkeypatch):
     monkeypatch.setattr(llm_client, "llm_available", lambda: False)
     _save_profile(client)
     contact = client.post("/contacts/manual", json={
         "name": "Jordan Smith", "title": "Engineer", "contact_type": "engineer",
-        "job_id": seeded_job.id,
     }).json()
 
     draft = client.post("/emails/draft", json={
-        "job_id": seeded_job.id, "contact_id": contact["id"],
+        "opportunity_id": seeded_opportunity.id, "contact_id": contact["id"],
     }).json()
     assert draft["llm_used"] is False
     assert draft["body"]
@@ -88,17 +87,16 @@ def test_email_draft_fallback_and_disabled_gmail(client, seeded_job, monkeypatch
     assert "disabled" in gmail["message"].lower()
 
 
-def test_linkedin_draft_flow(client, seeded_job, monkeypatch):
+def test_linkedin_draft_flow(client, seeded_opportunity, monkeypatch):
     monkeypatch.setattr(llm_client, "llm_available", lambda: False)
     _save_profile(client)
     contact = client.post("/contacts/manual", json={
         "name": "Jordan Smith", "title": "Engineer", "contact_type": "engineer",
-        "job_id": seeded_job.id,
     }).json()
 
     # Connection note: no subject, capped at 300 chars, stored as a LinkedIn draft.
     note = client.post("/linkedin/draft", json={
-        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "connection",
+        "opportunity_id": seeded_opportunity.id, "contact_id": contact["id"], "kind": "connection",
     }).json()
     assert note["llm_used"] is False
     assert note["subject"] is None
@@ -107,7 +105,7 @@ def test_linkedin_draft_flow(client, seeded_job, monkeypatch):
 
     # DM is a separate kind.
     dm = client.post("/linkedin/draft", json={
-        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "dm",
+        "opportunity_id": seeded_opportunity.id, "contact_id": contact["id"], "kind": "dm",
     }).json()
     assert dm["message_type"] == "linkedin_dm"
 
@@ -117,6 +115,6 @@ def test_linkedin_draft_flow(client, seeded_job, monkeypatch):
     assert note["id"] in [e["id"] for e in client.get("/emails").json()]
 
     bad = client.post("/linkedin/draft", json={
-        "job_id": seeded_job.id, "contact_id": contact["id"], "kind": "bogus",
+        "opportunity_id": seeded_opportunity.id, "contact_id": contact["id"], "kind": "bogus",
     })
     assert bad.status_code == 400

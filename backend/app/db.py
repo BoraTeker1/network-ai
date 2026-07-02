@@ -57,6 +57,10 @@ def run_lightweight_migrations() -> None:
             "contact_title": "ALTER TABLE messages ADD COLUMN contact_title VARCHAR",
             "opportunity_id": "ALTER TABLE messages ADD COLUMN opportunity_id INTEGER",
         },
+        # Email drafts moved from legacy Job rows to curated Opportunities.
+        "email_drafts": {
+            "opportunity_id": "ALTER TABLE email_drafts ADD COLUMN opportunity_id INTEGER",
+        },
         # Richer normalized job fields introduced with the newgrad-jobs.com adapter.
         "jobs": {
             "employment_type": "ALTER TABLE jobs ADD COLUMN employment_type VARCHAR",
