@@ -79,7 +79,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 const PUBLIC_PATHS = ["/login", "/signup", "/pricing", "/opportunities", "/pitch"];
 
 function isPublic(pathname: string): boolean {
-  if (pathname === "/") return true; // redirects to /opportunities
+  if (pathname === "/") return true; // Turkish landing (logged-in users are redirected to /opportunities)
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

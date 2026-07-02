@@ -31,12 +31,74 @@ const PLAN_TONE: Record<string, string> = {
   admin: "bg-violet-100 text-violet-800",
 };
 
+// Marketing links shown to logged-out visitors on the landing page only.
+const LANDING_LINKS = [
+  { href: "/opportunities", label: "Fırsatlar" },
+  { href: "/#nasil-calisir", label: "Nasıl çalışır" },
+  { href: "/#guven", label: "Güven" },
+];
+
+/** Simplified Turkish marketing nav — landing page, anonymous visitors only.
+ * Logged-in users never see this (they're redirected off "/" anyway). */
+function LandingNav() {
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <nav className="mx-auto flex max-w-5xl items-center gap-x-1 px-6 py-2.5">
+        <Link
+          href="/"
+          className="mr-1 shrink-0 whitespace-nowrap text-[15px] font-semibold tracking-tight text-slate-900"
+        >
+          Network<span className="text-blue-600">AI</span>
+        </Link>
+        <span className="mr-2 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-600">
+          Beta
+        </span>
+
+        <div className="hidden items-center gap-1 sm:flex">
+          {LANDING_LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/login"
+            className="rounded-md px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          >
+            Giriş yap
+          </Link>
+          <Link
+            href="/signup"
+            className="whitespace-nowrap rounded-md bg-blue-600 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Ücretsiz başla
+          </Link>
+        </div>
+      </nav>
+    </header>
+  );
+}
+
 export default function Nav() {
   const pathname = usePathname() || "";
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = SECONDARY.some((l) => isActive(pathname, l.href));
+
+  // Landing page for anonymous visitors gets the simplified marketing nav.
+  // While the session check is loading on "/" we also show it — logged-in
+  // users get redirected to /opportunities immediately after, so the app nav
+  // never flashes.
+  if (pathname === "/" && (loading || !user)) {
+    return <LandingNav />;
+  }
 
   async function handleLogout() {
     await signOut();
