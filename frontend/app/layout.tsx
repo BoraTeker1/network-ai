@@ -22,6 +22,17 @@ export default function RootLayout({
           <main className="mx-auto max-w-5xl px-6 py-8">
             <RouteGuard>{children}</RouteGuard>
           </main>
+          {/* Lightweight founder-contact line on every page — beta users need a
+              zero-friction way to report issues. mailto only; no support system. */}
+          <footer className="mx-auto max-w-5xl px-6 pb-8 text-center text-xs text-slate-400">
+            Beta — found a bug or have feedback?{" "}
+            <a
+              href="mailto:tekerbora@gmail.com?subject=Network%20AI%20feedback"
+              className="font-medium text-blue-600 hover:underline"
+            >
+              Email the founder
+            </a>
+          </footer>
         </AuthProvider>
       </body>
     </html>

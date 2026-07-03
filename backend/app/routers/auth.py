@@ -14,7 +14,7 @@ from ..db import get_db
 from ..deps import COOKIE_NAME, client_ip, require_user
 from ..models import User
 from ..schemas import LoginIn, SignupIn
-from ..services import audit
+from ..services import audit, events
 from ..services import auth as auth_service
 from ..services.rate_limit import rate_limit
 
@@ -58,6 +58,7 @@ def signup(
 
     _set_session_cookie(response, auth_service.create_session(db, user.id))
     audit.log(db, "signup", user_id=user.id, ip=client_ip(request), note=user.email)
+    events.track(db, "signup_completed", user_id=user.id)
     return _serialize(user)
 
 

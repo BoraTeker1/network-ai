@@ -1,18 +1,28 @@
 """SQLAlchemy database setup for Network AI.
 
-Uses a local SQLite file (network_ai.db) for the MVP.
+Uses a local SQLite file (network_ai.db) for the MVP. DATABASE_URL overrides
+the location for deployment (e.g. sqlite:////data/network_ai.db on a
+persistent volume).
 """
+
+import os
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # SQLite file lives next to the backend/ folder when you run from backend/.
-SQLALCHEMY_DATABASE_URL = "sqlite:///./network_ai.db"
+SQLALCHEMY_DATABASE_URL = (
+    os.getenv("DATABASE_URL", "").strip() or "sqlite:///./network_ai.db"
+)
 
 # check_same_thread is required for SQLite + FastAPI's threaded request handling.
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args=(
+        {"check_same_thread": False}
+        if SQLALCHEMY_DATABASE_URL.startswith("sqlite")
+        else {}
+    ),
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

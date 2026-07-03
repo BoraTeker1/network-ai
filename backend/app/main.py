@@ -18,6 +18,7 @@ from .routers import (
     billing,
     contacts,
     emails,
+    events,
     goals,
     linkedin,
     messages,
@@ -69,6 +70,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router)
 app.include_router(billing.router)
+app.include_router(events.router)
 app.include_router(profile.router)
 app.include_router(messages.router)
 app.include_router(goals.router)

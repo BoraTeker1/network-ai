@@ -56,6 +56,63 @@ function confidenceStyle(c: string | null): string {
   return "bg-amber-50 text-amber-700"; // sample
 }
 
+// Tiny per-card feedback on the eligibility label — the signal that tells us
+// whether the Turkey-applicability classifier is actually right for real users.
+function LabelFeedbackControl({ opportunityId }: { opportunityId: number }) {
+  const [state, setState] = useState<"idle" | "reason" | "done">("idle");
+  const [reason, setReason] = useState("");
+
+  async function send(verdict: "right" | "wrong", withReason?: string) {
+    try {
+      await api.sendLabelFeedback(opportunityId, verdict, withReason);
+      setState("done");
+    } catch {
+      setState("done"); // feedback is best-effort; never nag the user about it
+    }
+  }
+
+  if (state === "done") {
+    return <span className="text-xs text-slate-400">Thanks — noted ✓</span>;
+  }
+  if (state === "reason") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="What's wrong? (optional)"
+          className="rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:border-blue-500 focus:outline-none"
+        />
+        <button
+          onClick={() => send("wrong", reason.trim() || undefined)}
+          className="text-xs font-medium text-blue-600 hover:underline"
+        >
+          Send
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+      Label right?
+      <button
+        onClick={() => send("right")}
+        title="This label looks right"
+        className="rounded px-1 hover:bg-green-50 hover:text-green-700"
+      >
+        ✓
+      </button>
+      <button
+        onClick={() => setState("reason")}
+        title="This label looks wrong"
+        className="rounded px-1 hover:bg-rose-50 hover:text-rose-700"
+      >
+        ✗
+      </button>
+    </span>
+  );
+}
+
 const chip = "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
 const select =
   "rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none";
@@ -246,7 +303,10 @@ export default function OpportunitiesPage() {
                 </span>
               </div>
 
-              <p className="mt-1.5 text-xs text-slate-500">{opp.turkey_applicability_reason}</p>
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <span>{opp.turkey_applicability_reason}</span>
+                <LabelFeedbackControl opportunityId={opp.id} />
+              </p>
 
               {opp.match.reason && (
                 <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-1.5">

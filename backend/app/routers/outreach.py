@@ -17,7 +17,7 @@ from ..db import get_db
 from ..deps import require_user
 from ..models import Message, Profile, User
 from ..schemas import OutreachPasteIn, OutreachSaveIn
-from ..services import outreach, plans
+from ..services import events, outreach, plans
 from ..services.rate_limit import rate_limit
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
@@ -64,7 +64,7 @@ def draft_from_paste(
 
     skills, resume_summary = _profile_skills(db, user.id)
 
-    return outreach.generate(
+    draft = outreach.generate(
         jd_text=jd_text,
         contact=payload.contact.model_dump() if payload.contact else {},
         language=payload.language,
@@ -82,6 +82,9 @@ def draft_from_paste(
         include_work_auth_line=payload.include_work_auth_line,
         skill_highlight=payload.skill_highlight,
     )
+    events.track(db, "draft_created", user_id=user.id,
+                 note=f"{draft['channel']}/{draft['language']}, llm={draft['llm_used']}")
+    return draft
 
 
 @router.post("/save-draft")
@@ -123,6 +126,7 @@ def save_draft(
     db.add(msg)
     db.commit()
     db.refresh(msg)
+    events.track(db, "pipeline_saved", user_id=user.id, note=f"message {msg.id}")
 
     # Reuse the messages serializer so the pipeline/Next Move see an identical
     # shape (checklist, tone, timestamps) to any other Message.

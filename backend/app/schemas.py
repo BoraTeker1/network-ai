@@ -223,6 +223,18 @@ class OpportunityImportIn(BaseModel):
     is_sample: bool = False
 
 
+class LabelFeedbackIn(BaseModel):
+    verdict: str = Field(max_length=10)  # "right" | "wrong"
+    reason: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
+
+
+# ----- Product events (validation sprint) -----
+
+class EventIn(BaseModel):
+    event: str = Field(max_length=50)  # one of models.PRODUCT_EVENTS
+    note: Optional[str] = Field(None, max_length=MAX_NOTE_CHARS)
+
+
 # ----- Generic -----
 
 class StatusResponse(BaseModel):

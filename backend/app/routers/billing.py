@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import client_ip, require_admin, require_user
 from ..models import PLANS, User
-from ..services import audit, plans
+from ..services import audit, events, plans
 from ..services.auth import normalize_email
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -77,8 +77,10 @@ def my_plan(user: User = Depends(require_user), db: Session = Depends(get_db)):
 
 
 @router.post("/checkout")
-def checkout(user: User = Depends(require_user)):
-    """Mock provider: NEVER fakes a successful payment."""
+def checkout(user: User = Depends(require_user), db: Session = Depends(get_db)):
+    """Mock provider: NEVER fakes a successful payment. Each call is recorded as
+    a fake-door willingness-to-pay signal for the validation sprint."""
+    events.track(db, "mock_checkout_viewed", user_id=user.id)
     return {
         "status": "unavailable",
         "message": (

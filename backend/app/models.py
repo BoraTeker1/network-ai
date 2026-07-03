@@ -355,6 +355,49 @@ class AuditEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+# ----- Product analytics (validation sprint) ----------------------------------
+# First-party, minimal funnel events — no third-party provider. NEVER stores
+# resume text, message bodies, or JD text; `note` is a short non-sensitive hint
+# (e.g. an item count). Allowlisted in PRODUCT_EVENTS so junk can't be inserted.
+
+PRODUCT_EVENTS = (
+    "signup_completed",
+    "resume_uploaded",
+    "opportunity_viewed",
+    "draft_created",
+    "pipeline_saved",
+    "pro_button_clicked",
+    "mock_checkout_viewed",
+)
+
+
+class ProductEvent(Base):
+    __tablename__ = "product_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)  # None for anonymous
+    event = Column(String, index=True, nullable=False)   # one of PRODUCT_EVENTS
+    note = Column(String, nullable=True)                 # short, non-sensitive
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# User feedback on the Turkey-applicability labels — the signal that tells us
+# whether the classifier (the product's differentiator) is actually right.
+LABEL_FEEDBACK_VERDICTS = ("right", "wrong")
+
+
+class LabelFeedback(Base):
+    __tablename__ = "label_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    opportunity_id = Column(Integer, ForeignKey("opportunities.id"), index=True, nullable=False)
+    label = Column(String, nullable=True)    # the label shown when they judged it
+    verdict = Column(String, index=True, nullable=False)  # "right" | "wrong"
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # ----- Curated Turkey + Remote/EU opportunity feed (additive, isolated table) --
 # Deliberately SEPARATE from Job (which powers the US matcher/messages flows). An
 # opportunity is a curated/compliant listing for Turkish junior engineers that

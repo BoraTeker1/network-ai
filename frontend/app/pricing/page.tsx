@@ -19,6 +19,9 @@ export default function PricingPage() {
   async function upgrade() {
     setBusy(true);
     setNotice(null);
+    // Fake-door WTP signal: the click itself is the validation metric. The
+    // backend separately records mock_checkout_viewed when /checkout responds.
+    api.trackEvent("pro_button_clicked");
     try {
       const r = await api.checkout();
       setNotice(r.message); // honest: payments aren't live in the beta

@@ -13,7 +13,7 @@ from ..db import get_db
 from ..deps import require_user
 from ..models import Profile, User
 from ..schemas import ResumeTextIn
-from ..services import audit, plans
+from ..services import audit, events, plans
 from ..services.rate_limit import rate_limit
 from ..services.resume_parser import parse_resume
 from ..services.resume_file import (
@@ -71,6 +71,8 @@ def _save_profile_from_text(db: Session, resume_text: str, user_id: str) -> dict
 
     db.commit()
     db.refresh(profile)
+    events.track(db, "resume_uploaded", user_id=user_id,
+                 note=f"{len(parsed['skills'])} skills extracted")
     return _serialize(profile)
 
 

@@ -1022,6 +1022,16 @@ def list_opportunities(
     include_ineligible=False, profile_skills=None, limit=100,
 ) -> list[dict]:
     q = db.query(Opportunity)
+    # Real users must never mistake the demo seed for real roles: once any real
+    # listing exists, sample rows are hidden unless explicitly requested via
+    # confidence=sample_demo. (An all-sample DB still shows them so a fresh
+    # local demo is never empty.)
+    has_real = (
+        db.query(Opportunity.id).filter(Opportunity.is_sample.isnot(True)).first()
+        is not None
+    )
+    if has_real and confidence != "sample_demo":
+        q = q.filter(Opportunity.is_sample.isnot(True))
     if region:
         q = q.filter(Opportunity.target_region == region)
     if seniority:

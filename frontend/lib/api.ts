@@ -509,6 +509,26 @@ export const api = {
     }
   },
 
+  // Product events (first-party, validation sprint). Fire-and-forget: analytics
+  // must never break or slow the UI, so failures are swallowed.
+  trackEvent: (event: string, note?: string): void => {
+    request("/events", {
+      method: "POST",
+      body: JSON.stringify({ event, note }),
+    }).catch(() => {});
+  },
+
+  // Eligibility-label feedback (validates the Turkey-applicability classifier).
+  sendLabelFeedback: (
+    opportunityId: number,
+    verdict: "right" | "wrong",
+    reason?: string,
+  ) =>
+    request<{ status: string }>(`/opportunities/${opportunityId}/label-feedback`, {
+      method: "POST",
+      body: JSON.stringify({ verdict, reason: reason || undefined }),
+    }),
+
   // Billing / plans
   getBillingPlan: () => request<BillingOverview>("/billing/plan"),
   getBillingPlans: () =>

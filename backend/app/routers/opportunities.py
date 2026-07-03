@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import optional_user, require_user
-from ..models import Profile, User
-from ..schemas import OpportunityImportIn
-from ..services import opportunities
+from ..models import LABEL_FEEDBACK_VERDICTS, LabelFeedback, Opportunity, Profile, User
+from ..schemas import LabelFeedbackIn, OpportunityImportIn
+from ..services import events, opportunities
 from ..services.rate_limit import rate_limit
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -60,12 +60,47 @@ def list_opportunities(
         function=function, include_ineligible=include_ineligible,
         profile_skills=_profile_skills(db, user), limit=limit,
     )
+    if user is not None:
+        # One event per feed load (not per card) — enough for the funnel.
+        events.track(db, "opportunity_viewed", user_id=user.id,
+                     note=f"{len(items)} items")
     return {
         "count": len(items),
         "function": function,
         "applicability_labels": opportunities.APPLICABILITY_KEYS,
         "items": items,
     }
+
+
+@router.post("/{opportunity_id}/label-feedback", status_code=201)
+def label_feedback(
+    opportunity_id: int,
+    payload: LabelFeedbackIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    """Record whether the Turkey-applicability label looked right or wrong —
+    the validation signal for the classifier itself."""
+    if payload.verdict not in LABEL_FEEDBACK_VERDICTS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"verdict must be one of: {', '.join(LABEL_FEEDBACK_VERDICTS)}",
+        )
+    opp = db.query(Opportunity).filter(Opportunity.id == opportunity_id).first()
+    if opp is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+
+    fb = LabelFeedback(
+        user_id=user.id,
+        opportunity_id=opportunity_id,
+        label=opp.turkey_applicability_label,
+        verdict=payload.verdict,
+        reason=(payload.reason or "").strip() or None,
+    )
+    db.add(fb)
+    db.commit()
+    return {"status": "recorded", "opportunity_id": opportunity_id,
+            "verdict": payload.verdict}
 
 
 @router.get("/sources")
