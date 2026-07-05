@@ -9,22 +9,33 @@ import { Button, Card, PageHeader, Pill } from "@/components/ui";
 export default function PricingPage() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const [paymentsLive, setPaymentsLive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.getBillingPlans().then((r) => setPlans(r.plans)).catch(() => {});
+    api
+      .getBillingPlans()
+      .then((r) => {
+        setPlans(r.plans);
+        setPaymentsLive(r.payments_live);
+      })
+      .catch(() => {});
   }, []);
 
   async function upgrade() {
     setBusy(true);
     setNotice(null);
-    // Fake-door WTP signal: the click itself is the validation metric. The
-    // backend separately records mock_checkout_viewed when /checkout responds.
+    // WTP signal: the click itself is the validation metric. The backend
+    // separately records checkout_link_opened / mock_checkout_viewed.
     api.trackEvent("pro_button_clicked");
     try {
       const r = await api.checkout();
-      setNotice(r.message); // honest: payments aren't live in the beta
+      setNotice(r.message);
+      if (r.url) {
+        // Hosted provider checkout (new tab, so the notice stays visible).
+        window.open(r.url, "_blank", "noopener,noreferrer");
+      }
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -39,11 +50,19 @@ export default function PricingPage() {
         subtitle="Try the whole loop free. Upgrade when the limits get in your way."
       />
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-        <strong>Early-access beta:</strong> payments aren&apos;t live yet. Pro is
-        granted manually to beta users — the button below tells you exactly that.
-        No card fields, no fake checkout.
-      </div>
+      {paymentsLive ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <strong>Early-access beta:</strong> payment happens on our provider&apos;s
+          secure checkout page — we never see your card. Pay with your account
+          email and Pro is activated on that account within a few hours.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <strong>Early-access beta:</strong> payments aren&apos;t live yet. Pro is
+          granted manually to beta users — the button below tells you exactly that.
+          No card fields, no fake checkout.
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {plans.map((p) => {

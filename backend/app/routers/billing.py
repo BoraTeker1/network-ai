@@ -1,8 +1,11 @@
-"""Billing / plans — mock provider for the beta. HONEST by design.
+"""Billing / plans — hosted payment link (or honest fake-door) for the beta.
 
-There is NO fake payment success anywhere: checkout tells the truth ("payments
-aren't live yet"), and the only way a plan changes is an audited admin action
-(POST /billing/set-plan or scripts/create_user.py).
+There is NO fake payment success anywhere. With PAYMENT_LINK_URL set, checkout
+sends the user to the provider's hosted page (iyzico / Lemon Squeezy / Stripe
+Payment Link) — card data never touches this server. Without it, checkout says
+payments aren't live. Either way, the only way a plan changes is an audited
+admin action (POST /billing/set-plan or scripts/create_user.py) after the
+provider's payment notification.
 
 # TODO(stripe): real integration checklist (do NOT ship half of this):
 #   1. `pip install stripe`; STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET from env
@@ -21,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from .. import config
 from ..db import get_db
 from ..deps import client_ip, require_admin, require_user
 from ..models import PLANS, User
@@ -67,7 +71,7 @@ class SetPlanIn(BaseModel):
 @router.get("/plans")
 def list_plans():
     """Public pricing catalog (no account required to see pricing)."""
-    return {"plans": PLAN_CATALOG, "beta": True}
+    return {"plans": PLAN_CATALOG, "beta": True, "payments_live": config.payments_live()}
 
 
 @router.get("/plan")
@@ -78,8 +82,22 @@ def my_plan(user: User = Depends(require_user), db: Session = Depends(get_db)):
 
 @router.post("/checkout")
 def checkout(user: User = Depends(require_user), db: Session = Depends(get_db)):
-    """Mock provider: NEVER fakes a successful payment. Each call is recorded as
-    a fake-door willingness-to-pay signal for the validation sprint."""
+    """Hosted payment link when configured; honest fake-door otherwise. Never
+    fakes a successful payment — the plan flips only via the audited admin
+    action after the provider confirms the payment."""
+    link = config.get_payment_link_url()
+    if link:
+        events.track(db, "checkout_link_opened", user_id=user.id)
+        return {
+            "status": "payment_link",
+            "url": link,
+            "message": (
+                "You'll pay on our provider's secure checkout page. Use the same "
+                "email as your Network AI account — Pro is activated on it within "
+                "a few hours of payment."
+            ),
+            "plan": user.plan,
+        }
     events.track(db, "mock_checkout_viewed", user_id=user.id)
     return {
         "status": "unavailable",

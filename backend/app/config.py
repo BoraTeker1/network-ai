@@ -50,6 +50,23 @@ def has_anthropic() -> bool:
     return bool(get_anthropic_api_key())
 
 
+# ----- Billing (beta: hosted payment link, no card data touches us) -----
+
+def get_payment_link_url() -> str:
+    """Hosted checkout link (iyzico / Lemon Squeezy / Stripe Payment Link).
+
+    When set, POST /billing/checkout returns this URL and the frontend sends
+    the user there. Payment success does NOT auto-upgrade the plan — the
+    provider hosts the card form and we flip the plan via the audited admin
+    action after the payment notification. Blank → honest fake-door message.
+    """
+    return _get("PAYMENT_LINK_URL")
+
+
+def payments_live() -> bool:
+    return bool(get_payment_link_url())
+
+
 # ----- OpenAI (secondary / fallback) -----
 
 def get_openai_api_key() -> str:

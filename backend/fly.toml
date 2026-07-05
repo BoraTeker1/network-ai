@@ -1,0 +1,35 @@
+# Fly.io config for the Network AI backend (see DEPLOYMENT.md).
+#
+# One-time setup after `fly launch --no-deploy` (or if the app doesn't exist):
+#   fly apps create network-ai-api
+#   fly volumes create data --region fra --size 1 --app network-ai-api
+#   fly secrets set ANTHROPIC_API_KEY=... --app network-ai-api
+#   fly secrets set ALLOWED_ORIGINS=https://<your-frontend>.vercel.app --app network-ai-api
+#   fly secrets set PAYMENT_LINK_URL=https://...   # once the payment link exists
+# Then: fly deploy --app network-ai-api
+
+app = "network-ai-api"
+primary_region = "fra" # Frankfurt — closest region to Türkiye
+
+[env]
+  COOKIE_SECURE = "true"
+  TRUST_PROXY = "true"
+  DATABASE_URL = "sqlite:////data/network_ai.db"
+  ANTHROPIC_MODEL = "claude-sonnet-5"
+
+[mounts]
+  source = "data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Exactly one always-on machine: sessions/rate limits are in-process and the
+  # SQLite volume can only attach to one machine anyway.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

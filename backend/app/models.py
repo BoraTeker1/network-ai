@@ -368,6 +368,7 @@ PRODUCT_EVENTS = (
     "pipeline_saved",
     "pro_button_clicked",
     "mock_checkout_viewed",
+    "checkout_link_opened",
 )
 
 

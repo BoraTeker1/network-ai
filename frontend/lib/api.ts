@@ -532,9 +532,11 @@ export const api = {
   // Billing / plans
   getBillingPlan: () => request<BillingOverview>("/billing/plan"),
   getBillingPlans: () =>
-    request<{ plans: PricingPlan[]; beta: boolean }>("/billing/plans"),
+    request<{ plans: PricingPlan[]; beta: boolean; payments_live: boolean }>(
+      "/billing/plans",
+    ),
   checkout: () =>
-    request<{ status: string; message: string; plan: string }>(
+    request<{ status: string; message: string; plan: string; url?: string }>(
       "/billing/checkout",
       { method: "POST" },
     ),
