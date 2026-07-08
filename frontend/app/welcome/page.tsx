@@ -17,7 +17,7 @@ export default function WelcomePage() {
           {t.welcome.steps.map((s, i) => (
             <Card key={STEP_HREFS[i]} hover className="p-4">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
                   {i + 1}
                 </span>
                 <h2 className="font-semibold text-slate-900">{s.title}</h2>
@@ -25,7 +25,7 @@ export default function WelcomePage() {
               <p className="mt-2 text-sm text-slate-600">{s.body}</p>
               <Link
                 href={STEP_HREFS[i]}
-                className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline"
+                className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline"
               >
                 {s.cta}
               </Link>

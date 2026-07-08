@@ -169,7 +169,7 @@ export default function NextMovePage() {
           value={replyText}
           onChange={(e) => setReplyText(e.target.value)}
           placeholder={t.nextMove.pastePh}
-          className="mt-1 h-32 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="mt-1 h-32 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-brand-500 focus:outline-none"
         />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div className="min-w-0">
@@ -179,7 +179,7 @@ export default function NextMovePage() {
             {linkOptions.length === 0 ? (
               <p className="mt-1 w-72 max-w-full rounded-md border border-dashed border-slate-300 px-2 py-2 text-xs text-slate-500">
                 {t.nextMove.noTrackedPre}
-                <Link href="/pipeline" className="font-medium text-blue-600 hover:underline">
+                <Link href="/pipeline" className="font-medium text-brand-600 hover:underline">
                   {t.nextMove.noTrackedLink}
                 </Link>
                 {t.nextMove.noTrackedPost}
@@ -188,7 +188,7 @@ export default function NextMovePage() {
               <select
                 value={linkedKey}
                 onChange={(e) => setLinkedKey(e.target.value)}
-                className="mt-1 block w-72 max-w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="mt-1 block w-72 max-w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-brand-500 focus:outline-none"
               >
                 <option value="">{t.nextMove.noLinkedItem}</option>
                 {linkOptions.map((o) => (
@@ -202,7 +202,7 @@ export default function NextMovePage() {
           <button
             onClick={analyze}
             disabled={analyzing}
-            className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="mt-5 rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {analyzing ? t.nextMove.analyzing : t.nextMove.analyzeBtn}
           </button>
@@ -265,8 +265,8 @@ export default function NextMovePage() {
           </section>
 
           {/* Recommended next move */}
-          <section className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+          <section className="rounded-lg border border-brand-100 bg-brand-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand-700">
               {t.nextMove.recommendedNext}
             </div>
             <p className="mt-1 text-sm text-slate-700">
@@ -293,16 +293,16 @@ export default function NextMovePage() {
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
                 />
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  className="mt-2 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="mt-2 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-brand-500 focus:outline-none"
                 />
                 <button
                   onClick={() => copy(`Subject: ${subject}\n\n${body}`, t.nextMove.whatEmail)}
-                  className="mt-2 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                  className="mt-2 rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
                 >
                   {t.nextMove.copyEmail}
                 </button>
@@ -316,11 +316,11 @@ export default function NextMovePage() {
                 <textarea
                   value={shortMsg}
                   onChange={(e) => setShortMsg(e.target.value)}
-                  className="mt-1 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="mt-1 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-brand-500 focus:outline-none"
                 />
                 <button
                   onClick={() => copy(shortMsg, t.nextMove.whatMessage)}
-                  className="mt-2 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                  className="mt-2 rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
                 >
                   {t.nextMove.copyMessage}
                 </button>
@@ -370,7 +370,7 @@ export default function NextMovePage() {
                       className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
                         suggested
                           ? "bg-green-600 text-white hover:bg-green-700"
-                          : "border border-slate-300 text-slate-700 hover:border-blue-400"
+                          : "border border-slate-300 text-slate-700 hover:border-brand-400"
                       }`}
                     >
                       {b.label}

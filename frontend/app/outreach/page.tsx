@@ -39,8 +39,8 @@ function Toggle<T extends string>({
           onClick={() => onChange(opt)}
           className={`rounded px-3 py-1 text-sm font-medium ${
             value === opt
-              ? "bg-blue-600 text-white"
-              : "text-slate-600 hover:text-blue-600"
+              ? "bg-brand-600 text-white"
+              : "text-slate-600 hover:text-brand-600"
           }`}
         >
           {labels[opt]}
@@ -78,7 +78,7 @@ function RiskChecklist({ checklist }: { checklist: Checklist }) {
 }
 
 const input =
-  "rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none";
+  "rounded-md border border-slate-300 p-2 text-sm focus:border-brand-500 focus:outline-none";
 
 export default function OutreachPage() {
   const t = useT();
@@ -288,7 +288,7 @@ export default function OutreachPage() {
         {/* Who to contact — surfaced BEFORE drafting so the user finds a real
             person first, then pastes the name above and drafts to them. */}
         {(guidance || guidanceLoading) && (
-          <div className="space-y-3 rounded-md border border-blue-100 bg-blue-50/50 p-4">
+          <div className="space-y-3 rounded-md border border-brand-100 bg-brand-50/50 p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-slate-900">
                 {t.outreach.whoToContact(guidance?.company ?? "")}
@@ -314,7 +314,7 @@ export default function OutreachPage() {
                     .sort((a, b) => a.priority - b.priority)
                     .map((r) => (
                       <li key={r.role} className="flex gap-2 text-sm">
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
                           {r.priority}
                         </span>
                         <div>
@@ -329,7 +329,7 @@ export default function OutreachPage() {
                   <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                     {guidance.manual_search_links.map((l) => (
                       <li key={l.url}>
-                        <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                        <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline">
                           {l.label} ↗
                         </a>
                       </li>
@@ -403,7 +403,7 @@ export default function OutreachPage() {
           <button
             onClick={generate}
             disabled={loading}
-            className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="ml-auto rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {loading ? t.outreach.drafting : t.outreach.draftBtn}
           </button>
@@ -453,7 +453,7 @@ export default function OutreachPage() {
               {savedId ? (
                 <Link
                   href="/pipeline"
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
                 >
                   {t.outreach.savedView}
                 </Link>
@@ -461,7 +461,7 @@ export default function OutreachPage() {
                 <button
                   onClick={saveToPipeline}
                   disabled={saving}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? t.common.saving : t.outreach.saveToPipeline}
                 </button>

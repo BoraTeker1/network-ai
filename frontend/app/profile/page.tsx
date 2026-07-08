@@ -114,7 +114,7 @@ export default function ProfilePage() {
           <button
             onClick={handleUpload}
             disabled={uploading || !selectedFile}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {uploading ? t.profile.uploading : t.profile.uploadBtn}
           </button>
@@ -142,7 +142,7 @@ export default function ProfilePage() {
         {t.profile.option2}
       </div>
       <textarea
-        className="mt-2 h-56 w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-blue-500 focus:outline-none"
+        className="mt-2 h-56 w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-brand-500 focus:outline-none"
         placeholder={t.profile.pastePh}
         value={resumeText}
         onChange={(e) => setResumeText(e.target.value)}
@@ -152,7 +152,7 @@ export default function ProfilePage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {saving ? t.common.saving : t.profile.saveProfile}
         </button>
@@ -181,7 +181,7 @@ export default function ProfilePage() {
                 profile.skills.map((s) => (
                   <span
                     key={s}
-                    className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+                    className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"
                   >
                     {s}
                   </span>

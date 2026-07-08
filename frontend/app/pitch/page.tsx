@@ -29,7 +29,7 @@ export default function PitchPage() {
     <div className="space-y-8">
       {/* Hero */}
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+        <div className="text-xs font-semibold uppercase tracking-wide text-brand-600">
           The pitch
         </div>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
@@ -44,13 +44,13 @@ export default function PitchPage() {
         <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href="/opportunities"
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             See opportunities →
           </Link>
           <Link
             href="/outreach"
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-400"
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-brand-400"
           >
             Draft outreach
           </Link>

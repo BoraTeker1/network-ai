@@ -90,7 +90,7 @@ export default function GoalsPage() {
   }
 
   const field =
-    "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+    "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none";
 
   return (
     <div>
@@ -215,8 +215,8 @@ export default function GoalsPage() {
                     onClick={() => toggleType(ct)}
                     className={`rounded-full border px-3 py-1 text-xs ${
                       active
-                        ? "border-blue-500 bg-blue-50 font-medium text-blue-700"
-                        : "border-slate-300 text-slate-600 hover:border-blue-400"
+                        ? "border-brand-500 bg-brand-50 font-medium text-brand-700"
+                        : "border-slate-300 text-slate-600 hover:border-brand-400"
                     }`}
                   >
                     {(t.goals.contactTypes as Record<string, string>)[ct] ?? ct.replace(/_/g, " ")}
@@ -241,7 +241,7 @@ export default function GoalsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {saving ? t.common.saving : goal ? t.goals.updateGoal : t.goals.createGoal}
           </button>

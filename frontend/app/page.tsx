@@ -25,7 +25,7 @@ function PrimaryCta({ children }: { children: React.ReactNode }) {
   return (
     <Link
       href="/signup"
-      className="inline-flex items-center justify-center rounded-md bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+      className="inline-flex items-center justify-center rounded-full bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
     >
       {children}
     </Link>
@@ -36,7 +36,7 @@ function SecondaryCta({ children }: { children: React.ReactNode }) {
   return (
     <Link
       href="/login"
-      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+      className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
     >
       {children}
     </Link>
@@ -72,7 +72,7 @@ function ValueIcon({ name }: { name: (typeof CARD_ICONS)[number] }) {
     ),
   };
   return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
       <svg
         viewBox="0 0 24 24"
         className="h-[18px] w-[18px]"
@@ -105,7 +105,7 @@ function MockRoleRow({
   const tone =
     badgeTone === "green"
       ? "bg-green-100 text-green-800"
-      : "bg-blue-50 text-blue-700";
+      : "bg-brand-50 text-brand-700";
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
       <div className="min-w-0">
@@ -137,12 +137,12 @@ function MockStage({
     <div
       className={`flex flex-1 flex-col items-center rounded-lg border px-2 py-1.5 ${
         active
-          ? "border-blue-600 bg-blue-50/70"
+          ? "border-brand-600 bg-brand-50/70"
           : "border-slate-200 bg-white"
       }`}
     >
       <span
-        className={`text-sm font-bold ${active ? "text-blue-700" : "text-slate-700"}`}
+        className={`text-sm font-bold ${active ? "text-brand-700" : "text-slate-700"}`}
       >
         {count}
       </span>
@@ -187,7 +187,7 @@ function ProductMockup() {
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {t.landing.mock.todays}
               </span>
-              <span className="text-[11px] font-medium text-blue-600">
+              <span className="text-[11px] font-medium text-brand-600">
                 {t.landing.mock.newRoles}
               </span>
             </div>
@@ -213,7 +213,7 @@ function ProductMockup() {
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {t.landing.mock.draftLabel}
               </span>
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
                 TR / EN
               </span>
             </div>
@@ -284,14 +284,14 @@ export default function LandingPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-16 overflow-x-clip pb-10">
       {/* Hero — full-bleed soft blue band; copy left, product mockup right */}
-      <section className="relative left-1/2 -mx-[50vw] -mt-8 w-screen border-b border-blue-100 bg-blue-50/70">
+      <section className="relative left-1/2 -mx-[50vw] -mt-8 w-screen border-b border-brand-100 bg-brand-50/70">
         <div className="mx-auto grid max-w-5xl items-center gap-10 px-6 py-12 sm:py-16 lg:grid-cols-[1fr_minmax(0,26rem)]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-block rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
+              <span className="inline-block rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700">
                 {t.landing.badge}
               </span>
-              <span className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+              <span className="text-xs font-semibold uppercase tracking-wide text-brand-600">
                 {t.landing.tagline}
               </span>
             </div>
@@ -304,7 +304,7 @@ export default function LandingPage() {
               <SecondaryCta>{t.nav.login}</SecondaryCta>
               <Link
                 href="/opportunities"
-                className="text-sm font-medium text-blue-600 hover:underline"
+                className="text-sm font-medium text-brand-600 hover:underline"
               >
                 {t.landing.seeOpportunities}
               </Link>
@@ -347,7 +347,7 @@ export default function LandingPage() {
           {t.landing.steps.map((s, i) => (
             <div key={s.title} className="flex flex-1 items-center md:min-w-0">
               <Card className="flex-1 p-4 md:min-w-0">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
                   {i + 1}
                 </span>
                 <h3 className="mt-2.5 text-sm font-semibold text-slate-900">
@@ -370,7 +370,7 @@ export default function LandingPage() {
 
       {/* Trust */}
       <section id="guven" className="scroll-mt-20">
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 sm:p-8">
+        <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-6 sm:p-8">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
             {t.landing.trustTitle}
           </h2>
@@ -383,7 +383,7 @@ export default function LandingPage() {
               >
                 <span
                   aria-hidden
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white"
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white"
                 >
                   ✓
                 </span>

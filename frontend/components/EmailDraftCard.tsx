@@ -91,7 +91,7 @@ export default function EmailDraftCard({
       {/* Proposal header */}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand-700">
             {isLinkedIn
               ? t.emailCard.proposesChannel(channelLabel)
               : t.emailCard.proposesEmail}
@@ -144,7 +144,7 @@ export default function EmailDraftCard({
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
           />
         </div>
       )}
@@ -167,7 +167,7 @@ export default function EmailDraftCard({
           className={`mt-1 h-40 w-full rounded-md border p-2 text-sm focus:outline-none ${
             overLimit
               ? "border-red-400 focus:border-red-500"
-              : "border-slate-300 focus:border-blue-500"
+              : "border-slate-300 focus:border-brand-500"
           }`}
         />
         {overLimit && (
@@ -196,7 +196,7 @@ export default function EmailDraftCard({
             </p>
           )}
           {email.suggested_next_step && (
-            <p className="rounded-md bg-blue-50 p-2 text-xs text-blue-800">
+            <p className="rounded-md bg-brand-50 p-2 text-xs text-brand-800">
               <span className="font-medium">{t.emailCard.suggestedNext}</span>{" "}
               {email.suggested_next_step}
             </p>
@@ -221,7 +221,7 @@ export default function EmailDraftCard({
         <button
           disabled={busy}
           onClick={() => run(() => api.patchEmail(email.id, { subject, body }))}
-          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:border-blue-400 disabled:opacity-50"
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:border-brand-400 disabled:opacity-50"
         >
           {t.emailCard.saveEdit}
         </button>
@@ -242,7 +242,7 @@ export default function EmailDraftCard({
         <button
           disabled={busy}
           onClick={handleCopy}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {isLinkedIn ? (isConnection ? t.emailCard.copyNote : t.emailCard.copyMessage) : t.emailCard.copyEmail}
         </button>
@@ -283,8 +283,8 @@ export default function EmailDraftCard({
               onClick={() => run(() => api.patchEmail(email.id, { outcome: o }))}
               className={`rounded-full border px-3 py-1 text-xs disabled:opacity-50 ${
                 email.outcome === o
-                  ? "border-blue-500 bg-blue-50 font-medium text-blue-700"
-                  : "border-slate-300 text-slate-600 hover:border-blue-400"
+                  ? "border-brand-500 bg-brand-50 font-medium text-brand-700"
+                  : "border-slate-300 text-slate-600 hover:border-brand-400"
               }`}
             >
               {(t.ui.outcome as Record<string, string>)[o] ?? o.replace(/_/g, " ")}

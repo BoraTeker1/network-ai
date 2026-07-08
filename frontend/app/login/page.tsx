@@ -9,7 +9,7 @@ import { Button, Card, ErrorBanner, TrustLine } from "@/components/ui";
 import { useT } from "@/lib/i18n";
 
 const input =
-  "w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none";
+  "w-full rounded-md border border-slate-300 p-2 text-sm focus:border-brand-500 focus:outline-none";
 
 function LoginForm() {
   const t = useT();
@@ -77,7 +77,7 @@ function LoginForm() {
 
       <p className="text-center text-sm text-slate-600">
         {t.auth.newHere}
-        <Link href="/signup" className="font-medium text-blue-600 hover:underline">
+        <Link href="/signup" className="font-medium text-brand-600 hover:underline">
           {t.auth.createAccount}
         </Link>
       </p>

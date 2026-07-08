@@ -107,7 +107,7 @@ function OutreachCard({
             href={m.job_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-brand-600 hover:underline"
           >
             {t.pipeline.openRole}
           </a>
@@ -249,7 +249,7 @@ export default function PipelinePage() {
           {/* Got a reply? */}
           <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
             {t.pipeline.gotReplyPre}
-            <Link href="/next-move" className="font-medium text-blue-600 hover:underline">
+            <Link href="/next-move" className="font-medium text-brand-600 hover:underline">
               {t.pipeline.gotReplyLink}
             </Link>
             {t.pipeline.gotReplyPost}

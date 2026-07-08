@@ -50,7 +50,7 @@ export default function PricingPage() {
       <PageHeader title={t.pricing.title} subtitle={t.pricing.subtitle} />
 
       {paymentsLive ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
           <strong>{t.pricing.betaLabel}</strong>{t.pricing.liveText}
         </div>
       ) : (
@@ -64,7 +64,7 @@ export default function PricingPage() {
           const isPro = p.id === "pro";
           const isCurrent = user?.plan === p.id;
           return (
-            <Card key={p.id} className={`p-5 ${isPro ? "border-blue-300" : ""}`}>
+            <Card key={p.id} className={`p-5 ${isPro ? "border-brand-300" : ""}`}>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">{p.name}</h2>
                 {isPro && <Pill tone="blue">{t.pricing.recommended}</Pill>}
@@ -91,7 +91,7 @@ export default function PricingPage() {
                   ) : (
                     <Link
                       href="/signup"
-                      className="block w-full rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
+                      className="block w-full rounded-full bg-brand-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-brand-700"
                     >
                       {t.pricing.signupFirst}
                     </Link>
@@ -111,7 +111,7 @@ export default function PricingPage() {
       </div>
 
       {notice && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">{notice}</p>
+        <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900">{notice}</p>
       )}
 
       {/* Privacy & trust — the promise that differentiates the product. */}
