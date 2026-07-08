@@ -118,3 +118,36 @@ def test_linkedin_draft_flow(client, seeded_opportunity, monkeypatch):
         "opportunity_id": seeded_opportunity.id, "contact_id": contact["id"], "kind": "bogus",
     })
     assert bad.status_code == 400
+
+
+# ----- Structured profile editing (PUT /profile) -----
+
+def test_update_profile_edits_skills_and_roles(client):
+    client.post("/profile/resume-text",
+                json={"resume_text": "Backend developer. Skills: Python, FastAPI."})
+    resp = client.put("/profile", json={
+        "skills": ["Python", " python ", "Go", ""],
+        "target_roles": ["Backend Engineer"],
+        "experience_summary": "2 yıl backend deneyimi.",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skills"] == ["Python", "Go"]          # deduped + cleaned
+    assert body["target_roles"] == ["Backend Engineer"]
+    assert body["experience_summary"] == "2 yıl backend deneyimi."
+    # persisted
+    assert client.get("/profile").json()["skills"] == ["Python", "Go"]
+
+
+def test_update_profile_creates_profile_if_missing(client):
+    resp = client.put("/profile", json={"skills": ["SQL"]})
+    assert resp.status_code == 200
+    assert resp.json()["skills"] == ["SQL"]
+
+
+def test_update_profile_partial_leaves_other_fields(client):
+    client.put("/profile", json={"skills": ["Python"], "experience_summary": "x"})
+    resp = client.put("/profile", json={"target_roles": ["SRE"]})
+    body = resp.json()
+    assert body["skills"] == ["Python"] and body["experience_summary"] == "x"
+    assert body["target_roles"] == ["SRE"]

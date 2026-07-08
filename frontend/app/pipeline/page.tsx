@@ -165,6 +165,13 @@ function OutreachCard({
         >
           {t.pipeline.needsFollowUp}
         </Button>
+        {/* Reply analysis lives inside the tracked application, not in the nav. */}
+        <Link
+          href={`/next-move?item=message:${m.id}`}
+          className="ml-auto text-sm font-medium text-brand-600 hover:underline"
+        >
+          {t.pipeline.analyzeReply}
+        </Link>
       </div>
     </Card>
   );

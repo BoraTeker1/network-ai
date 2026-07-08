@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import require_user
 from ..models import Profile, User
-from ..schemas import ResumeTextIn
+from ..schemas import ProfileUpdateIn, ResumeTextIn
 from ..services import audit, events, plans
 from ..services.rate_limit import rate_limit
 from ..services.resume_parser import parse_resume
@@ -139,4 +139,42 @@ def get_profile(db: Session = Depends(get_db), user: User = Depends(require_user
     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     if profile is None:
         raise HTTPException(status_code=404, detail="No profile saved yet")
+    return _serialize(profile)
+
+
+def _clean_list(items: list[str], *, max_item_chars: int = 80) -> list[str]:
+    """Strip, drop empties, dedupe case-insensitively, keep first-seen order."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        s = (item or "").strip()[:max_item_chars]
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            out.append(s)
+    return out
+
+
+@router.put("")
+def update_profile(
+    payload: ProfileUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    """Edit the structured profile fields directly (skills chips, target roles,
+    summary). Creates an empty profile if none exists yet, so a user can build
+    one by hand without uploading a resume. The raw resume text is untouched."""
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    if profile is None:
+        profile = Profile(user_id=user.id)
+        db.add(profile)
+
+    if payload.skills is not None:
+        profile.skills = json.dumps(_clean_list(payload.skills))
+    if payload.target_roles is not None:
+        profile.target_roles = json.dumps(_clean_list(payload.target_roles))
+    if payload.experience_summary is not None:
+        profile.experience_summary = payload.experience_summary.strip() or None
+
+    db.commit()
+    db.refresh(profile)
     return _serialize(profile)

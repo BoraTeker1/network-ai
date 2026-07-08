@@ -61,6 +61,11 @@ export default function NextMovePage() {
   useEffect(() => {
     api.getMessages().then(setMessages).catch(() => {});
     api.getEmails().then(setEmails).catch(() => {});
+    // Deep link from a tracked application ("Analyze reply" on a pipeline
+    // card): ?item=message:<id> preselects that item. Read from
+    // window.location so the client page needs no Suspense boundary.
+    const item = new URLSearchParams(window.location.search).get("item");
+    if (item && /^(message|email):\d+$/.test(item)) setLinkedKey(item);
   }, []);
 
   const linkOptions = useMemo(() => {

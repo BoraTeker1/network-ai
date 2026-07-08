@@ -23,6 +23,8 @@ const CONFIDENCE = ["", "official_ats", "public_api", "manual_curated", "sample_
 // Freshness windows in days ("" = any time).
 const POSTED = ["", "1", "7", "30", "90"];
 
+const JUNIOR_LEVELS = ["new_grad", "junior", "internship"];
+
 // Look up a filter value in a dict map, treating "" as "all".
 function label(map: Record<string, string>, key: string | null | undefined): string {
   return map[key || "all"] ?? key ?? "";
@@ -39,16 +41,49 @@ function timeAgo(t: Dict, dateStr: string): string {
   return t.opportunities.monthsAgo(Math.floor(days / 30));
 }
 
-// 4-tier Turkey-applicability meta for the match panel (dark surface, so light text tones).
-function tierMeta(t: Dict, label_: string | null): { short: string; tone: string } {
-  if (label_?.startsWith("Strong"))
-    return { short: t.opportunities.tier.strong, tone: "text-brand-300" };
-  if (label_ === "Possibly eligible")
-    return { short: t.opportunities.tier.possible, tone: "text-amber-300" };
-  if (label_ === "Unclear")
-    return { short: t.opportunities.tier.unclear, tone: "text-slate-300" };
-  return { short: t.opportunities.tier.no, tone: "text-rose-300" };
+function tierKey(label_: string | null): "strong" | "possible" | "unclear" | "no" {
+  if (label_?.startsWith("Strong")) return "strong";
+  if (label_ === "Possibly eligible") return "possible";
+  if (label_ === "Unclear") return "unclear";
+  return "no";
 }
+
+/**
+ * Explainable match score from the three signals the card shows: eligibility
+ * (max 45), level (max 20), and skill overlap (max 35). The overall label is
+ * derived from the score, so it can never contradict its own components —
+ * a strong-eligibility role with 0 matched skills tops out at "good".
+ */
+function matchInfo(opp: Opportunity): {
+  score: number;
+  key: "strong" | "good" | "fair" | "weak" | "no";
+} {
+  const tier = tierKey(opp.turkey_applicability_label);
+  if (tier === "no") return { score: 0, key: "no" };
+  const eligibility = { strong: 45, possible: 28, unclear: 12, no: 0 }[tier];
+  const level = JUNIOR_LEVELS.includes(opp.seniority_level)
+    ? 20
+    : opp.seniority_level === "mid"
+      ? 10
+      : opp.seniority_level === "unknown"
+        ? 8
+        : 0;
+  const { matched_count: matched, total_skills: total } = opp.match;
+  // Cap the denominator so long skill lists don't drown a real overlap.
+  const skills = total > 0 ? Math.round(35 * Math.min(1, matched / Math.min(total, 8))) : 0;
+  const score = eligibility + level + skills;
+  const key = score >= 80 ? "strong" : score >= 60 ? "good" : score >= 35 ? "fair" : "weak";
+  return { score, key };
+}
+
+const MATCH_TONE: Record<string, string> = {
+  strong: "bg-brand-600 text-white",
+  good: "bg-brand-50 text-brand-700",
+  fair: "bg-amber-50 text-amber-700",
+  weak: "bg-slate-100 text-slate-500",
+  no: "bg-rose-50 text-rose-600",
+};
+
 function confidenceStyle(c: string | null): string {
   if (c === "official_ats") return "bg-brand-50 text-brand-700";
   if (c === "public_api") return "bg-sky-50 text-sky-700";
@@ -114,7 +149,6 @@ function LabelFeedbackControl({ opportunityId }: { opportunityId: number }) {
   );
 }
 
-const chip = "rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600";
 const select =
   "rounded-full border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 focus:border-brand-500 focus:outline-none";
 const tab = (active: boolean) =>
@@ -122,13 +156,109 @@ const tab = (active: boolean) =>
     active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
   }`;
 
-/** One glyph + label cell in the card's metadata grid. */
-function MetaCell({ glyph, label: text }: { glyph: string; label: string }) {
+/** Compact job card: one column, ~half the old height. The match score is a
+ * pill whose label is derived from (and therefore consistent with) the
+ * location/level/skill rows shown right under the title. */
+function OpportunityCard({
+  opp,
+  onDraft,
+}: {
+  opp: Opportunity;
+  onDraft: (opp: Opportunity) => void;
+}) {
+  const t = useT();
+  const to = t.opportunities;
+  const match = matchInfo(opp);
+  const reasonText =
+    (to.reasons as Record<string, string>)[opp.turkey_applicability_reason_code ?? ""] ??
+    opp.turkey_applicability_reason ??
+    "";
+  const skillsText =
+    opp.match.total_skills > 0
+      ? to.match.skillsCount(opp.match.matched_count, opp.match.total_skills)
+      : to.match.noSkillsData;
+  const matchedPreview = opp.match.matched_skills.slice(0, 3).join(", ");
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
-      <span aria-hidden className="text-slate-400">{glyph}</span>
-      <span className="capitalize">{text}</span>
-    </span>
+    <Card hover className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+            {opp.date_posted && <span>{timeAgo(t, opp.date_posted)}</span>}
+            {opp.source_confidence && (
+              <span
+                className={`rounded-full px-2 py-0.5 font-medium ${confidenceStyle(opp.source_confidence)}`}
+              >
+                {label(to.confidence, opp.source_confidence)}
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 text-base font-semibold leading-snug text-slate-900">
+            {opp.title}
+          </div>
+          <div className="truncate text-sm text-slate-500">
+            <span className="font-medium text-slate-700">{opp.company}</span>
+            {opp.location ? <> · {opp.location}</> : null}
+          </div>
+        </div>
+        {/* Match score — compact and consistent with the rows below. */}
+        <div className="shrink-0 text-right">
+          <span
+            className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${MATCH_TONE[match.key]}`}
+          >
+            {to.match[match.key]}
+          </span>
+          {match.key !== "no" && (
+            <div className="mt-0.5 text-[11px] text-slate-400">
+              {to.match.scoreOf(match.score)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Why this score: location/eligibility · level · skill overlap. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2.5 text-xs text-slate-600">
+        <span title={reasonText}>
+          <span aria-hidden>📍</span> {label(to.region, opp.target_region)} —{" "}
+          {(to.tier as Record<string, string>)[tierKey(opp.turkey_applicability_label)]}
+        </span>
+        <span>
+          <span aria-hidden>🎓</span> {label(to.level, opp.seniority_level)}
+        </span>
+        <span title={matchedPreview}>
+          <span aria-hidden>🧩</span> {skillsText}
+          {matchedPreview && (
+            <span className="text-slate-400"> ({matchedPreview})</span>
+          )}
+        </span>
+      </div>
+      {reasonText && (
+        <p className="mt-1 text-xs leading-snug text-slate-400">{reasonText}</p>
+      )}
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => onDraft(opp)}>
+          {to.draftOutreach}
+        </Button>
+        {opp.is_sample ? (
+          <span className="text-xs text-slate-400">{to.sampleListing}</span>
+        ) : (
+          opp.url && (
+            <a
+              href={opp.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+            >
+              {to.openApplication}
+            </a>
+          )
+        )}
+        <span className="ml-auto">
+          <LabelFeedbackControl opportunityId={opp.id} />
+        </span>
+      </div>
+    </Card>
   );
 }
 
@@ -140,6 +270,7 @@ export default function OpportunitiesPage() {
   const [showSources, setShowSources] = useState(false);
   const [filters, setFilters] = useState<OpportunityFilters>({ function: "all" });
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [moreFilters, setMoreFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +318,12 @@ export default function OpportunitiesPage() {
 
   const liveSources = sources.filter((s) => s.live);
   const to = t.opportunities;
+  // Badge on the "more filters" toggle when hidden filters are active.
+  const secondaryActive =
+    Number(Boolean(filters.region)) +
+    Number(Boolean(filters.applicability)) +
+    Number(Boolean(filters.confidence)) +
+    Number(remoteOnly);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 px-6 py-8">
@@ -194,11 +331,7 @@ export default function OpportunitiesPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{to.title}</h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-600">
-            {to.subtitlePre}
-            <strong className="font-semibold text-slate-800">{to.subtitleStrong}</strong>
-            {to.subtitlePost}
-          </p>
+          <p className="mt-1 max-w-xl text-sm text-slate-600">{to.subtitle}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <Button variant="secondary" onClick={refresh} disabled={refreshing}>
@@ -215,12 +348,6 @@ export default function OpportunitiesPage() {
           )}
         </div>
       </div>
-
-      <p className="text-xs text-slate-500">
-        {to.sourcedPre}
-        <strong>{to.noScraping}</strong>
-        {to.sourcedPost}
-      </p>
 
       {/* Source registry — slim disclosure line */}
       <div className="text-sm">
@@ -258,7 +385,8 @@ export default function OpportunitiesPage() {
         )}
       </div>
 
-      {/* Filter bar — sticky under the nav: level/field chips + pill filters */}
+      {/* Filter bar — sticky under the nav. Primary: level, field, posted date.
+          Everything else folds under "More filters". */}
       <div className="sticky top-[57px] z-10 space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           {LEVELS.map((lv) => (
@@ -280,17 +408,6 @@ export default function OpportunitiesPage() {
               {label(to.field, fl)}
             </button>
           ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select className={select} value={filters.region ?? ""} onChange={(e) => setFilters((f) => ({ ...f, region: e.target.value || undefined }))}>
-            {REGIONS.map((r) => <option key={r} value={r}>{label(to.region, r)}</option>)}
-          </select>
-          <select className={select} value={filters.applicability ?? ""} onChange={(e) => setFilters((f) => ({ ...f, applicability: e.target.value || undefined }))}>
-            {APPLICABILITY.map((a) => <option key={a} value={a}>{label(to.applicability, a)}</option>)}
-          </select>
-          <select className={select} value={filters.confidence ?? ""} onChange={(e) => setFilters((f) => ({ ...f, confidence: e.target.value || undefined }))}>
-            {CONFIDENCE.map((c) => <option key={c} value={c}>{label(to.confidence, c)}</option>)}
-          </select>
           <select
             className={select}
             value={filters.posted_within_days ? String(filters.posted_within_days) : ""}
@@ -304,13 +421,38 @@ export default function OpportunitiesPage() {
             {POSTED.map((p) => <option key={p} value={p}>{label(to.posted, p)}</option>)}
           </select>
           <button
-            onClick={() => setRemoteOnly((v) => !v)}
-            aria-pressed={remoteOnly}
-            className={tab(remoteOnly)}
+            onClick={() => setMoreFilters((v) => !v)}
+            className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           >
-            {to.remoteOnly}
+            {moreFilters ? to.hideFilters : to.otherFilters}
+            {!moreFilters && secondaryActive > 0 && (
+              <span className="rounded-full bg-brand-100 px-1.5 text-[10px] font-semibold text-brand-700">
+                {secondaryActive}
+              </span>
+            )}
+            <span aria-hidden>{moreFilters ? "▴" : "▾"}</span>
           </button>
         </div>
+        {moreFilters && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+            <select className={select} value={filters.region ?? ""} onChange={(e) => setFilters((f) => ({ ...f, region: e.target.value || undefined }))}>
+              {REGIONS.map((r) => <option key={r} value={r}>{label(to.region, r)}</option>)}
+            </select>
+            <select className={select} value={filters.applicability ?? ""} onChange={(e) => setFilters((f) => ({ ...f, applicability: e.target.value || undefined }))}>
+              {APPLICABILITY.map((a) => <option key={a} value={a}>{label(to.applicability, a)}</option>)}
+            </select>
+            <select className={select} value={filters.confidence ?? ""} onChange={(e) => setFilters((f) => ({ ...f, confidence: e.target.value || undefined }))}>
+              {CONFIDENCE.map((c) => <option key={c} value={c}>{label(to.confidence, c)}</option>)}
+            </select>
+            <button
+              onClick={() => setRemoteOnly((v) => !v)}
+              aria-pressed={remoteOnly}
+              className={tab(remoteOnly)}
+            >
+              {to.remoteOnly}
+            </button>
+          </div>
+        )}
       </div>
 
       {notice && <p className="text-sm text-slate-600">{notice}</p>}
@@ -319,124 +461,17 @@ export default function OpportunitiesPage() {
       {loading ? (
         <p className="text-sm text-slate-500">{t.common.loading}</p>
       ) : items.length === 0 ? (
-        <EmptyState title={to.emptyTitle} description={to.emptyDesc} />
+        <EmptyState
+          title={to.emptyTitle}
+          description={to.emptyDesc}
+          ctaLabel={refreshing ? to.refreshing : to.emptyCta}
+          onCta={refresh}
+        />
       ) : (
-        <div className="space-y-3">
-          {items.map((opp) => {
-            const tier = tierMeta(t, opp.turkey_applicability_label);
-            return (
-              <Card key={opp.id} hover className="overflow-hidden">
-                <div className="md:grid md:grid-cols-[1fr,220px]">
-                  {/* Main zone */}
-                  <div className="p-4">
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-                      {opp.date_posted && <span>{timeAgo(t, opp.date_posted)}</span>}
-                      {opp.source_confidence && (
-                        <span className={`rounded-full px-2 py-0.5 font-medium ${confidenceStyle(opp.source_confidence)}`}>
-                          {label(to.confidence, opp.source_confidence)}
-                        </span>
-                      )}
-                      {opp.source_provider && <span>{opp.source_provider}</span>}
-                    </div>
-
-                    <div className="mt-1 text-lg font-semibold leading-tight text-slate-900">
-                      {opp.title}
-                    </div>
-                    <div className="mt-0.5 text-sm text-slate-500">
-                      <span className="font-medium text-slate-700">{opp.company}</span>
-                      {opp.location ? <> / {opp.location}</> : null}
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3 sm:max-w-md">
-                      <MetaCell glyph="🌍" label={label(to.region, opp.target_region)} />
-                      <MetaCell glyph="🏠" label={opp.remote_policy} />
-                      <MetaCell glyph="🎓" label={label(to.level, opp.seniority_level)} />
-                      {opp.language_expectation && <MetaCell glyph="💬" label={opp.language_expectation} />}
-                    </div>
-
-                    {opp.tags.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {opp.tags.slice(0, 5).map((tag) => (
-                          <span key={tag} className={chip}>{tag}</span>
-                        ))}
-                      </div>
-                    )}
-
-                    {opp.work_auth_note && (
-                      <p className="mt-2 text-xs text-slate-500">
-                        <span className="font-semibold uppercase tracking-wide text-slate-400">
-                          {to.workAuth}
-                        </span>{" "}
-                        {opp.work_auth_note}
-                      </p>
-                    )}
-
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3">
-                      <Button onClick={() => draftOutreach(opp)}>{to.draftOutreach}</Button>
-                      {opp.is_sample ? (
-                        <span className="text-xs text-slate-400">{to.sampleListing}</span>
-                      ) : (
-                        opp.url && (
-                          <a
-                            href={opp.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                          >
-                            {to.openApplication}
-                          </a>
-                        )
-                      )}
-                      <span className="ml-auto">
-                        <LabelFeedbackControl opportunityId={opp.id} />
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Match panel — Turkey-applicability tier + skill overlap (no invented %) */}
-                  <div className="bg-panel-900 p-4 text-white md:flex md:flex-col md:justify-center">
-                    <div className={`text-[11px] font-semibold uppercase tracking-widest ${tier.tone}`}>
-                      {to.turkeyFit}
-                    </div>
-                    <div className={`mt-1 text-lg font-bold leading-tight ${tier.tone}`}>
-                      {tier.short}
-                    </div>
-                    {opp.turkey_applicability_reason && (
-                      <p className="mt-1.5 text-xs leading-relaxed text-panel-100/90">
-                        {opp.turkey_applicability_reason}
-                      </p>
-                    )}
-                    {opp.match.reason && (
-                      <div className="mt-3 border-t border-panel-700/60 pt-3">
-                        {opp.match.matched_skills.length > 0 ? (
-                          <ul className="space-y-1">
-                            {opp.match.matched_skills.slice(0, 4).map((s) => (
-                              <li key={s} className="flex items-center gap-1.5 text-xs text-panel-100">
-                                <span aria-hidden className="text-brand-300">✓</span>
-                                {s}
-                              </li>
-                            ))}
-                            {opp.match.matched_skills.length > 4 && (
-                              <li className="text-xs text-panel-300">
-                                {to.moreSkills(opp.match.matched_skills.length - 4)}
-                              </li>
-                            )}
-                          </ul>
-                        ) : (
-                          <p className="text-xs text-panel-200">{opp.match.reason}</p>
-                        )}
-                        {opp.match.total_skills > 0 && (
-                          <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-panel-300">
-                            {to.skillsOfYours(opp.match.matched_count, opp.match.total_skills)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+        <div className="space-y-2.5">
+          {items.map((opp) => (
+            <OpportunityCard key={opp.id} opp={opp} onDraft={draftOutreach} />
+          ))}
         </div>
       )}
     </div>

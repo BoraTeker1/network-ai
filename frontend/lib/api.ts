@@ -166,6 +166,7 @@ export type Opportunity = {
   country_scope: string | null;
   turkey_applicability_label: string | null;
   turkey_applicability_reason: string | null;
+  turkey_applicability_reason_code: string | null;
   language_expectation: string | null;
   work_auth_note: string | null;
   tags: string[];
@@ -544,6 +545,15 @@ export const api = {
 
   // Profile
   getProfile: () => request<Profile>("/profile"),
+  updateProfile: (fields: {
+    skills?: string[];
+    target_roles?: string[];
+    experience_summary?: string;
+  }) =>
+    request<Profile>("/profile", {
+      method: "PUT",
+      body: JSON.stringify(fields),
+    }),
   saveProfile: (resume_text: string) =>
     request<Profile>("/profile/resume-text", {
       method: "POST",

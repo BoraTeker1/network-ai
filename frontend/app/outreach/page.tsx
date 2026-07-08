@@ -101,6 +101,12 @@ export default function OutreachPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
+  // Entry mode: the primary path is arriving prefilled from /opportunities;
+  // pasting an external posting is the secondary "Harici ilan ekle" path.
+  const [hasPrefill, setHasPrefill] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [showJd, setShowJd] = useState(false);
+
   // Preserved opportunity context (set when arriving from the feed) so a saved
   // pipeline item links back to its source opportunity + apply URL.
   const [opportunityId, setOpportunityId] = useState<number | null>(null);
@@ -147,6 +153,7 @@ export default function OutreachPage() {
         setRegion(p.target_region);
       if (typeof p.include_location_line === "boolean")
         setIncludeLocation(p.include_location_line);
+      setHasPrefill(true);
       setNotice(t.outreach.prefilledNotice);
     } catch {
       /* ignore malformed prefill */
@@ -258,6 +265,38 @@ export default function OutreachPage() {
     }
   }
 
+  // No job selected yet and manual mode not chosen → point at the feed first.
+  if (!hasPrefill && !showManual && !draft) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+        <PageHeader title={t.outreach.title} subtitle={t.outreach.subtitle} />
+        <TrustLine />
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+          <div className="text-base font-semibold text-slate-800">
+            {t.outreach.pickTitle}
+          </div>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            {t.outreach.pickDesc}
+          </p>
+          <Link
+            href="/opportunities"
+            className="mt-4 inline-block rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            {t.outreach.pickCta}
+          </Link>
+          <div className="mt-3">
+            <button
+              onClick={() => setShowManual(true)}
+              className="text-sm font-medium text-slate-500 hover:text-slate-800 hover:underline"
+            >
+              {t.outreach.addExternal}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
       <PageHeader title={t.outreach.title} subtitle={t.outreach.subtitle} />
@@ -265,22 +304,69 @@ export default function OutreachPage() {
       <TrustLine />
 
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div>
-          <label className="text-sm font-medium text-slate-700">
-            {t.outreach.jdLabel}
-          </label>
-          <textarea
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-            rows={7}
-            placeholder={t.outreach.jdPlaceholder}
-            className={`mt-1 w-full ${input}`}
-          />
-        </div>
+        {hasPrefill && !showManual ? (
+          /* Primary path: the selected opportunity, prefilled. JD is editable
+             behind a disclosure instead of dominating the page. */
+          <div className="rounded-md border border-brand-100 bg-brand-50/40 p-3">
+            <SectionLabel>{t.outreach.selectedJob}</SectionLabel>
+            <div className="mt-1 text-base font-semibold leading-snug text-slate-900">
+              {role || company}
+            </div>
+            <div className="text-sm text-slate-600">
+              {role ? company : null}
+              {jobUrl && (
+                <>
+                  {role ? " · " : null}
+                  <a
+                    href={jobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-600 hover:underline"
+                  >
+                    {t.opportunities.openApplication}
+                  </a>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setShowJd((v) => !v)}
+              className="mt-2 text-xs font-medium text-slate-500 hover:text-slate-800"
+            >
+              {t.outreach.editJd} {showJd ? "▴" : "▾"}
+            </button>
+            {showJd && (
+              <textarea
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                rows={7}
+                className={`mt-2 w-full ${input}`}
+              />
+            )}
+          </div>
+        ) : (
+          /* Secondary path: paste an external posting yourself. */
+          <div>
+            <label className="text-sm font-medium text-slate-700">
+              {t.outreach.jdLabel}
+            </label>
+            <p className="text-xs text-slate-500">{t.outreach.addExternalHint}</p>
+            <textarea
+              value={jdText}
+              onChange={(e) => setJdText(e.target.value)}
+              rows={7}
+              placeholder={t.outreach.jdPlaceholder}
+              className={`mt-1 w-full ${input}`}
+            />
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <input value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => loadGuidance()} placeholder={t.outreach.companyPh} className={input} />
-          <input value={role} onChange={(e) => setRole(e.target.value)} placeholder={t.outreach.rolePh} className={input} />
+          {(!hasPrefill || showManual) && (
+            <>
+              <input value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => loadGuidance()} placeholder={t.outreach.companyPh} className={input} />
+              <input value={role} onChange={(e) => setRole(e.target.value)} placeholder={t.outreach.rolePh} className={input} />
+            </>
+          )}
           <input value={name} onChange={(e) => { setName(e.target.value); setContactSaved(false); }} placeholder={t.outreach.namePh} className={input} />
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.outreach.titlePh} className={input} />
         </div>

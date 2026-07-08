@@ -281,6 +281,29 @@ def classify_turkey_applicability(
     return LABEL_UNCLEAR, "Eligibility for Turkey-based candidates is unclear — verify it yourself."
 
 
+# Stable codes for every reason string the classifier can emit, so the frontend
+# can localize them (the human string stays in the API for back-compat). Keys
+# must match the classifier literals above exactly.
+REASON_CODES = {
+    "The listing explicitly accepts Turkey-based candidates.": "explicit_yes",
+    "The listing explicitly excludes Turkey-based candidates.": "explicit_no",
+    "Senior-level role; this feed targets junior/new-grad candidates.": "senior_role",
+    "Requires US work authorization / US-only — not workable from Turkey.": "us_auth",
+    "Requires EU citizenship / EU right-to-work — Turkey isn't in the EU.": "eu_citizenship",
+    "US/North-America-based location — not workable from Turkey.": "us_location",
+    "On-site outside Turkey with no relocation/sponsorship mentioned.": "onsite_abroad",
+    "Turkey-based role.": "turkey_based",
+    "Remote worldwide — open to Turkey-based candidates.": "remote_worldwide",
+    "Remote within EMEA, which includes Turkey.": "remote_emea",
+    "Remote and contractor-friendly — workable from Turkey.": "remote_contractor",
+    "Remote in Europe — verify Turkey isn't excluded by country.": "remote_europe_verify",
+    "Relocation/visa sponsorship mentioned — verify your eligibility.": "relocation_possible",
+    "Remote but region not specified — verify eligibility on the page.": "remote_unspecified",
+    "Missing location / work-authorization details.": "missing_details",
+    "Eligibility for Turkey-based candidates is unclear — verify it yourself.": "unclear_generic",
+}
+
+
 # ----- Normalization -----
 
 def normalize_record(raw: dict, *, source: str, is_sample: bool) -> dict:
@@ -1109,6 +1132,9 @@ def serialize(row: Opportunity, profile_skills=None) -> dict:
         "country_scope": row.country_scope,
         "turkey_applicability_label": row.turkey_applicability_label,
         "turkey_applicability_reason": row.turkey_applicability_reason,
+        "turkey_applicability_reason_code": REASON_CODES.get(
+            row.turkey_applicability_reason
+        ),
         "language_expectation": row.language_expectation,
         "work_auth_note": row.work_auth_note,
         "tags": _tags(row),

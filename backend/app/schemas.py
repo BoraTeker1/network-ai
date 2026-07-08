@@ -42,6 +42,14 @@ class ProfileCreate(BaseModel):
     raw_resume: str = Field(max_length=MAX_RESUME_CHARS)
 
 
+class ProfileUpdateIn(BaseModel):
+    """Partial edit of the structured profile (parsed fields stay user-editable).
+    Omitted fields are left untouched."""
+    skills: Optional[List[str]] = Field(None, max_length=60)
+    target_roles: Optional[List[str]] = Field(None, max_length=20)
+    experience_summary: Optional[str] = Field(None, max_length=2000)
+
+
 class ProfileOut(BaseModel):
     id: int
     user_id: str

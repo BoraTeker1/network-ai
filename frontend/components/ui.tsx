@@ -123,30 +123,35 @@ export function TrustLine() {
   );
 }
 
-/** Friendly empty state with an optional call-to-action. */
+/** Friendly empty state with one clear call-to-action (link or button). */
 export function EmptyState({
   title,
   description,
   ctaHref,
   ctaLabel,
+  onCta,
 }: {
   title: string;
   description: string;
   ctaHref?: string;
   ctaLabel?: string;
+  onCta?: () => void;
 }) {
+  const ctaClass =
+    "mt-4 inline-block rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700";
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
       <div className="text-base font-semibold text-slate-800">{title}</div>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>
-      {ctaHref && ctaLabel && (
-        <Link
-          href={ctaHref}
-          className="mt-4 inline-block rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
+      {onCta && ctaLabel ? (
+        <button onClick={onCta} className={ctaClass}>
+          {ctaLabel}
+        </button>
+      ) : ctaHref && ctaLabel ? (
+        <Link href={ctaHref} className={ctaClass}>
           {ctaLabel}
         </Link>
-      )}
+      ) : null}
     </div>
   );
 }

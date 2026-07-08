@@ -728,3 +728,23 @@ def test_entry_level_groups_new_grad_and_junior(client):
     items = client.get("/opportunities?seniority=entry_level&include_ineligible=true").json()["items"]
     levels = {i["seniority_level"] for i in items if i["company"] == "El Co"}
     assert levels == {"new_grad", "junior"}
+
+
+def test_every_classifier_reason_has_a_stable_code():
+    import inspect
+    # Every literal reason emitted by the classifier must be in REASON_CODES so
+    # the frontend can localize it.
+    src = inspect.getsource(opp.classify_turkey_applicability)
+    import re
+    reasons = re.findall(r'return LABEL_\w+, "([^"]+)"', src)
+    assert reasons, "expected literal reasons in the classifier source"
+    for r in reasons:
+        assert r in opp.REASON_CODES, f"missing code for reason: {r}"
+
+
+def test_serialized_items_carry_reason_codes(client):
+    items = client.get("/opportunities").json()["items"]
+    assert items
+    assert all("turkey_applicability_reason_code" in i for i in items)
+    coded = [i for i in items if i["turkey_applicability_reason_code"]]
+    assert coded, "at least the seeded rows should have coded reasons"

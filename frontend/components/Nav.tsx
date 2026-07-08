@@ -2,25 +2,18 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang, useT, type Lang } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n/en";
 
-// The core workflow, in loop order: Opportunities → Outreach → Pipeline → Next Move.
+// The core workflow, in loop order: Opportunities → Applications → Outreach.
 // Profile sits alongside as the input that powers ranking + personalization.
+// Reply analysis (/next-move) is reached from within a tracked application.
 const PRIMARY: { href: string; label: (t: Dict) => string }[] = [
   { href: "/opportunities", label: (t) => t.nav.opportunities },
-  { href: "/outreach", label: (t) => t.nav.outreach },
   { href: "/pipeline", label: (t) => t.nav.pipeline },
-  { href: "/next-move", label: (t) => t.nav.nextMove },
+  { href: "/outreach", label: (t) => t.nav.outreach },
   { href: "/profile", label: (t) => t.nav.profile },
-];
-
-// Supporting surfaces — de-emphasized behind a "More" menu.
-const SECONDARY: { href: string; label: (t: Dict) => string }[] = [
-  { href: "/goals", label: (t) => t.nav.goals },
-  { href: "/pitch", label: (t) => t.nav.pitch },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -125,8 +118,6 @@ export default function Nav() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const t = useT();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = SECONDARY.some((l) => isActive(pathname, l.href));
 
   // Landing page for anonymous visitors gets the simplified marketing nav.
   // While the session check is loading on "/" we also show it — logged-in
@@ -210,50 +201,6 @@ export default function Nav() {
               >
                 {t.nav.signup}
               </Link>
-            </>
-          )}
-        </div>
-
-        {/* More menu — supporting pages, visually de-emphasized. */}
-        <div className="relative">
-          <button
-            onClick={() => setMoreOpen((v) => !v)}
-            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors ${
-              moreActive || moreOpen
-                ? "bg-slate-100 text-slate-900"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            {t.nav.more}
-            <span aria-hidden className="text-xs text-slate-400">
-              ▾
-            </span>
-          </button>
-          {moreOpen && (
-            <>
-              {/* click-away backdrop */}
-              <button
-                aria-hidden
-                tabIndex={-1}
-                onClick={() => setMoreOpen(false)}
-                className="fixed inset-0 z-10 cursor-default"
-              />
-              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                {SECONDARY.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    onClick={() => setMoreOpen(false)}
-                    className={`block px-3 py-1.5 text-sm ${
-                      isActive(pathname, l.href)
-                        ? "bg-brand-50 font-medium text-brand-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
-                    {l.label(t)}
-                  </Link>
-                ))}
-              </div>
             </>
           )}
         </div>
