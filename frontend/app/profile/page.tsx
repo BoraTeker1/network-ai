@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Profile } from "@/lib/api";
 import { EmptyState, PageHeader, WorkflowHint } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export default function ProfilePage() {
+  const t = useT();
   const [resumeText, setResumeText] = useState("");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function ProfilePage() {
 
   async function handleSave() {
     if (!resumeText.trim()) {
-      setError("Please paste your resume text first.");
+      setError(t.profile.pasteFirst);
       return;
     }
     setSaving(true);
@@ -47,7 +49,7 @@ export default function ProfilePage() {
       const p = await api.saveProfile(resumeText);
       setProfile(p);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save profile");
+      setError(e instanceof Error ? e.message : t.profile.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -55,7 +57,7 @@ export default function ProfilePage() {
 
   async function handleUpload() {
     if (!selectedFile) {
-      setUploadError("Please choose a .pdf or .docx file first.");
+      setUploadError(t.profile.chooseFileFirst);
       return;
     }
     setUploading(true);
@@ -64,11 +66,11 @@ export default function ProfilePage() {
     try {
       const p = await api.uploadResumeFile(selectedFile);
       setProfile(p);
-      setUploadNotice(`Parsed “${selectedFile.name}” and updated your profile.`);
+      setUploadNotice(t.profile.parsedNotice(selectedFile.name));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "Failed to upload resume");
+      setUploadError(e instanceof Error ? e.message : t.profile.uploadFailed);
     } finally {
       setUploading(false);
     }
@@ -76,25 +78,25 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Profile"
-        subtitle="Upload a PDF/DOCX or paste resume text. We extract your skills and a short summary locally — no LLM, nothing leaves your machine."
-      />
+      <PageHeader title={t.profile.title} subtitle={t.profile.subtitle} />
 
       <WorkflowHint>
-        Your skills power <strong>role ranking</strong> in Opportunities and personalize every
-        outreach draft.
+        {t.profile.hintPre}
+        <strong>{t.profile.hintStrong}</strong>
+        {t.profile.hintPost}
       </WorkflowHint>
 
       {/* Option 1: upload a resume file */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Option 1 · Upload a resume file
+          {t.profile.option1}
         </div>
         <p className="mt-1 text-sm text-slate-600">
-          Accepts <span className="font-medium">.pdf</span> or{" "}
-          <span className="font-medium">.docx</span>. Files are parsed locally by
-          the backend for this MVP — nothing is sent to a third party.
+          {t.profile.acceptsPre}
+          <span className="font-medium">.pdf</span>
+          {t.profile.acceptsOr}
+          <span className="font-medium">.docx</span>
+          {t.profile.acceptsPost}
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -114,13 +116,13 @@ export default function ProfilePage() {
             disabled={uploading || !selectedFile}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {uploading ? "Uploading…" : "Upload Resume File"}
+            {uploading ? t.profile.uploading : t.profile.uploadBtn}
           </button>
         </div>
 
         {selectedFile && !uploading && (
           <p className="mt-2 text-xs text-slate-500">
-            Selected: <span className="font-medium">{selectedFile.name}</span>
+            {t.profile.selectedLabel} <span className="font-medium">{selectedFile.name}</span>
           </p>
         )}
         {uploadNotice && (
@@ -137,11 +139,11 @@ export default function ProfilePage() {
 
       {/* Option 2: paste resume text (existing flow) */}
       <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Option 2 · Paste resume text
+        {t.profile.option2}
       </div>
       <textarea
         className="mt-2 h-56 w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-blue-500 focus:outline-none"
-        placeholder="Paste your resume text here..."
+        placeholder={t.profile.pastePh}
         value={resumeText}
         onChange={(e) => setResumeText(e.target.value)}
       />
@@ -152,32 +154,29 @@ export default function ProfilePage() {
           disabled={saving}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save Profile"}
+          {saving ? t.common.saving : t.profile.saveProfile}
         </button>
         {error && <span className="text-sm text-red-600">{error}</span>}
       </div>
 
       <hr className="my-8 border-slate-200" />
 
-      <h2 className="text-lg font-semibold">Extracted Profile</h2>
+      <h2 className="text-lg font-semibold">{t.profile.extracted}</h2>
       {loading ? (
-        <p className="mt-2 text-sm text-slate-500">Loading…</p>
+        <p className="mt-2 text-sm text-slate-500">{t.common.loading}</p>
       ) : !profile ? (
         <div className="mt-4">
-          <EmptyState
-            title="No profile saved yet"
-            description="Paste your resume text above and click Save Profile. We extract your skills and a short summary locally — no LLM, nothing leaves your machine."
-          />
+          <EmptyState title={t.profile.emptyTitle} description={t.profile.emptyDesc} />
         </div>
       ) : (
         <div className="mt-4 space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div>
             <div className="text-xs font-semibold uppercase text-slate-500">
-              Skills
+              {t.profile.skills}
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {profile.skills.length === 0 ? (
-                <span className="text-sm text-slate-400">None detected</span>
+                <span className="text-sm text-slate-400">{t.profile.noneDetected}</span>
               ) : (
                 profile.skills.map((s) => (
                   <span
@@ -193,7 +192,7 @@ export default function ProfilePage() {
 
           <div>
             <div className="text-xs font-semibold uppercase text-slate-500">
-              Experience Summary
+              {t.profile.expSummary}
             </div>
             <p className="mt-1 text-sm text-slate-700">
               {profile.experience_summary || "—"}
@@ -202,7 +201,7 @@ export default function ProfilePage() {
 
           <div>
             <div className="text-xs font-semibold uppercase text-slate-500">
-              Target Roles
+              {t.profile.targetRoles}
             </div>
             <p className="mt-1 text-sm text-slate-700">
               {profile.target_roles.length

@@ -9,6 +9,7 @@ import {
   CONTACT_TYPES,
 } from "@/lib/api";
 import { PageHeader, ErrorBanner, EmptyState } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 const TONE_OPTIONS = ["warm_low_pressure", "concise", "direct", "warm"];
 
@@ -24,6 +25,7 @@ const EMPTY: GoalInput = {
 };
 
 export default function GoalsPage() {
+  const t = useT();
   const [goal, setGoal] = useState<Goal | null>(null);
   const [form, setForm] = useState<GoalInput>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ export default function GoalsPage() {
         });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load goals");
+      setError(e instanceof Error ? e.message : t.goals.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -79,9 +81,9 @@ export default function GoalsPage() {
         ? await api.updateGoal(goal.id, form)
         : await api.createGoal(form);
       setGoal(saved);
-      setNotice("Goal saved. It will guide your outreach and email drafts.");
+      setNotice(t.goals.savedNotice);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save goal");
+      setError(e instanceof Error ? e.message : t.goals.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -92,10 +94,7 @@ export default function GoalsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Job-search goal"
-        subtitle="Tell Network AI what you're targeting and how you like to reach out. This guides matching, outreach strategy, and email drafts."
-      />
+      <PageHeader title={t.goals.title} subtitle={t.goals.subtitle} />
 
       {notice && (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
@@ -105,28 +104,28 @@ export default function GoalsPage() {
       <ErrorBanner message={error} />
 
       {loading ? (
-        <p className="mt-6 text-sm text-slate-500">Loading…</p>
+        <p className="mt-6 text-sm text-slate-500">{t.common.loading}</p>
       ) : (
         <div className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Target role
+                {t.goals.targetRole}
               </label>
               <input
                 className={field}
-                placeholder="Backend / AI Engineer"
+                placeholder={t.goals.rolePh}
                 value={form.target_role}
                 onChange={(e) => setForm({ ...form, target_role: e.target.value })}
               />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Target location
+                {t.goals.targetLocation}
               </label>
               <input
                 className={field}
-                placeholder="NYC or Remote"
+                placeholder={t.goals.locPh}
                 value={form.target_location}
                 onChange={(e) =>
                   setForm({ ...form, target_location: e.target.value })
@@ -135,11 +134,11 @@ export default function GoalsPage() {
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Target company type
+                {t.goals.targetCompanyType}
               </label>
               <input
                 className={field}
-                placeholder="Startups, AI labs, fintech…"
+                placeholder={t.goals.companyTypePh}
                 value={form.target_company_type}
                 onChange={(e) =>
                   setForm({ ...form, target_company_type: e.target.value })
@@ -148,7 +147,7 @@ export default function GoalsPage() {
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Outreach goal
+                {t.goals.outreachGoal}
               </label>
               <select
                 className={field}
@@ -159,14 +158,14 @@ export default function GoalsPage() {
               >
                 {OUTREACH_GOALS.map((g) => (
                   <option key={g} value={g}>
-                    {g.replace(/_/g, " ")}
+                    {(t.goals.outreachGoals as Record<string, string>)[g] ?? g.replace(/_/g, " ")}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Tone preference
+                {t.goals.tonePreference}
               </label>
               <select
                 className={field}
@@ -175,16 +174,16 @@ export default function GoalsPage() {
                   setForm({ ...form, tone_preference: e.target.value })
                 }
               >
-                {TONE_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, " ")}
+                {TONE_OPTIONS.map((tone) => (
+                  <option key={tone} value={tone}>
+                    {(t.goals.tones as Record<string, string>)[tone] ?? tone.replace(/_/g, " ")}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Max contacts per company
+                {t.goals.maxContacts}
               </label>
               <input
                 type="number"
@@ -204,23 +203,23 @@ export default function GoalsPage() {
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Preferred contact types
+              {t.goals.preferredContactTypes}
             </label>
             <div className="mt-2 flex flex-wrap gap-2">
-              {CONTACT_TYPES.map((t) => {
-                const active = (form.preferred_contact_types ?? []).includes(t);
+              {CONTACT_TYPES.map((ct) => {
+                const active = (form.preferred_contact_types ?? []).includes(ct);
                 return (
                   <button
-                    key={t}
+                    key={ct}
                     type="button"
-                    onClick={() => toggleType(t)}
+                    onClick={() => toggleType(ct)}
                     className={`rounded-full border px-3 py-1 text-xs ${
                       active
                         ? "border-blue-500 bg-blue-50 font-medium text-blue-700"
                         : "border-slate-300 text-slate-600 hover:border-blue-400"
                     }`}
                   >
-                    {t.replace(/_/g, " ")}
+                    {(t.goals.contactTypes as Record<string, string>)[ct] ?? ct.replace(/_/g, " ")}
                   </button>
                 );
               })}
@@ -229,11 +228,11 @@ export default function GoalsPage() {
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Notes
+              {t.goals.notes}
             </label>
             <textarea
               className={field}
-              placeholder="e.g. New grad, international student needing visa-friendly roles."
+              placeholder={t.goals.notesPh}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
@@ -244,17 +243,14 @@ export default function GoalsPage() {
             disabled={saving}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {saving ? "Saving…" : goal ? "Update Goal" : "Create Goal"}
+            {saving ? t.common.saving : goal ? t.goals.updateGoal : t.goals.createGoal}
           </button>
         </div>
       )}
 
       {!loading && !goal && (
         <div className="mt-4">
-          <EmptyState
-            title="No goal yet"
-            description="Fill in the form above and save your first job-search goal. The email copilot uses it to personalize drafts honestly."
-          />
+          <EmptyState title={t.goals.emptyTitle} description={t.goals.emptyDesc} />
         </div>
       )}
     </div>

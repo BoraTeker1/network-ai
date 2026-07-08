@@ -15,6 +15,6 @@ body {
 /* Calmer, more intentional focus ring than the default browser outline. */
 @layer base {
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-500/60 ring-offset-1 ring-offset-white;
+    @apply outline-none ring-2 ring-brand-500/60 ring-offset-1 ring-offset-white;
   }
 }

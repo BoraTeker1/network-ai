@@ -17,6 +17,7 @@ import {
   TrustLine,
   WorkflowHint,
 } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 const INTENT_STYLE: Record<string, string> = {
   positive: "bg-green-100 text-green-800",
@@ -34,18 +35,12 @@ const URGENCY_STYLE: Record<string, string> = {
   low: "bg-slate-100 text-slate-600",
 };
 
-// The outcomes Next Move can confirm into the pipeline.
-const OUTCOME_BUTTONS: { outcome: string; label: string }[] = [
-  { outcome: "replied", label: "Mark Replied" },
-  { outcome: "referral_received", label: "Mark Referral Received" },
-  { outcome: "interview_received", label: "Mark Interview Received" },
-];
-
 function label(s: string): string {
   return s.replace(/_/g, " ");
 }
 
 export default function NextMovePage() {
+  const t = useT();
 
   const [replyText, setReplyText] = useState("");
   const [linkedKey, setLinkedKey] = useState(""); // "message:12" | "email:3" | ""
@@ -73,17 +68,17 @@ export default function NextMovePage() {
     for (const m of messages) {
       opts.push({
         key: `message:${m.id}`,
-        label: `Message · ${m.company || "—"} · ${label(m.message_type)}`,
+        label: `${t.nextMove.messagePrefix} · ${m.company || "—"} · ${label(m.message_type)}`,
       });
     }
     for (const e of emails) {
       opts.push({
         key: `email:${e.id}`,
-        label: `Email · ${e.company || "—"} · ${e.contact_name || "contact"}`,
+        label: `${t.nextMove.emailPrefix} · ${e.company || "—"} · ${e.contact_name || t.nextMove.contactFallback}`,
       });
     }
     return opts;
-  }, [messages, emails]);
+  }, [messages, emails, t]);
 
   function buildInput() {
     const input: {
@@ -101,7 +96,7 @@ export default function NextMovePage() {
 
   async function analyze() {
     if (!replyText.trim()) {
-      setError("Paste the reply you received first.");
+      setError(t.nextMove.pasteFirst);
       return;
     }
     setAnalyzing(true);
@@ -117,7 +112,7 @@ export default function NextMovePage() {
       if (e instanceof ApiError && e.code === "plan_limit") {
         setPlanLimit(e.message);
       } else {
-        setError(e instanceof Error ? e.message : "Analysis failed");
+        setError(e instanceof Error ? e.message : t.nextMove.analysisFailed);
       }
     } finally {
       setAnalyzing(false);
@@ -127,9 +122,9 @@ export default function NextMovePage() {
   async function copy(text: string, what: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setNotice(`${what} copied to your clipboard.`);
+      setNotice(t.nextMove.copiedNotice(what));
     } catch {
-      setError("Clipboard blocked by the browser — select and copy manually.");
+      setError(t.nextMove.clipboardBlocked);
     }
   }
 
@@ -142,9 +137,9 @@ export default function NextMovePage() {
     try {
       if (target.type === "message") await api.setOutcome(target.id, outcome);
       else await api.patchEmail(target.id, { outcome });
-      setNotice(`Pipeline updated → ${label(outcome)}.`);
+      setNotice(t.nextMove.pipelineUpdated((t.ui.outcome as Record<string, string>)[outcome] ?? label(outcome)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update outcome");
+      setError(e instanceof Error ? e.message : t.nextMove.updateFailed);
     } finally {
       setBusyOutcome(false);
     }
@@ -154,15 +149,13 @@ export default function NextMovePage() {
 
   return (
     <div>
-      <PageHeader
-        title="Next Move AI"
-        subtitle="Got a reply from a recruiter, engineer, alumnus, or hiring manager? Paste it in. Next Move AI reads only what you paste — it never auto-reads your inbox — then summarizes the reply, detects intent, and drafts a response you review, edit, and send yourself."
-      />
+      <PageHeader title={t.nextMove.title} subtitle={t.nextMove.subtitle} />
 
       <div className="mt-4 space-y-3">
         <WorkflowHint>
-          Paste a reply, <strong>link it to a tracked outreach item</strong>, and get your next
-          response drafted.
+          {t.nextMove.hintPre}
+          <strong>{t.nextMove.hintStrong}</strong>
+          {t.nextMove.hintPost}
         </WorkflowHint>
         <TrustLine />
       </div>
@@ -170,26 +163,26 @@ export default function NextMovePage() {
       {/* Input */}
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Paste the reply you received
+          {t.nextMove.pasteLabel}
         </label>
         <textarea
           value={replyText}
           onChange={(e) => setReplyText(e.target.value)}
-          placeholder="e.g. “Thanks for reaching out! Your background looks great — are you free for a quick call this week?”"
+          placeholder={t.nextMove.pastePh}
           className="mt-1 h-32 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
         />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div className="min-w-0">
             <label className="text-xs font-medium text-slate-500">
-              Link a pipeline item (optional — enables outcome logging)
+              {t.nextMove.linkLabel}
             </label>
             {linkOptions.length === 0 ? (
               <p className="mt-1 w-72 max-w-full rounded-md border border-dashed border-slate-300 px-2 py-2 text-xs text-slate-500">
-                No tracked outreach yet.{" "}
+                {t.nextMove.noTrackedPre}
                 <Link href="/pipeline" className="font-medium text-blue-600 hover:underline">
-                  Save a draft to your pipeline
-                </Link>{" "}
-                to link replies here.
+                  {t.nextMove.noTrackedLink}
+                </Link>
+                {t.nextMove.noTrackedPost}
               </p>
             ) : (
               <select
@@ -197,7 +190,7 @@ export default function NextMovePage() {
                 onChange={(e) => setLinkedKey(e.target.value)}
                 className="mt-1 block w-72 max-w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
               >
-                <option value="">No linked item</option>
+                <option value="">{t.nextMove.noLinkedItem}</option>
                 {linkOptions.map((o) => (
                   <option key={o.key} value={o.key}>
                     {o.label}
@@ -211,7 +204,7 @@ export default function NextMovePage() {
             disabled={analyzing}
             className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {analyzing ? "Analyzing…" : "Analyze reply"}
+            {analyzing ? t.nextMove.analyzing : t.nextMove.analyzeBtn}
           </button>
         </div>
       </section>
@@ -230,7 +223,7 @@ export default function NextMovePage() {
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Reply summary
+                {t.nextMove.replySummary}
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -239,7 +232,7 @@ export default function NextMovePage() {
                     : "bg-slate-100 text-slate-600"
                 }`}
               >
-                {analysis.llm_used ? "✨ Analyzed by AI" : "Deterministic analysis"}
+                {analysis.llm_used ? t.nextMove.analyzedByAI : t.nextMove.deterministic}
               </span>
             </div>
             <p className="mt-1 text-sm text-slate-700">{analysis.summary}</p>
@@ -249,14 +242,14 @@ export default function NextMovePage() {
                   INTENT_STYLE[analysis.intent] ?? "bg-slate-100 text-slate-600"
                 }`}
               >
-                {label(analysis.intent)}
+                {(t.nextMove.intent as Record<string, string>)[analysis.intent] ?? label(analysis.intent)}
               </span>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   URGENCY_STYLE[analysis.urgency] ?? "bg-slate-100 text-slate-600"
                 }`}
               >
-                urgency: {analysis.urgency}
+                {t.nextMove.urgencyLabel((t.nextMove.urgency as Record<string, string>)[analysis.urgency] ?? analysis.urgency)}
               </span>
               {analysis.signals
                 .filter((s) => s !== analysis.intent)
@@ -265,7 +258,7 @@ export default function NextMovePage() {
                     key={s}
                     className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
                   >
-                    {label(s)}
+                    {(t.nextMove.intent as Record<string, string>)[s] ?? label(s)}
                   </span>
                 ))}
             </div>
@@ -274,14 +267,14 @@ export default function NextMovePage() {
           {/* Recommended next move */}
           <section className="rounded-lg border border-blue-100 bg-blue-50 p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-              Recommended next move
+              {t.nextMove.recommendedNext}
             </div>
             <p className="mt-1 text-sm text-slate-700">
               {analysis.recommended_next_action}
             </p>
             {analysis.risk_notes && (
               <p className="mt-2 text-xs text-slate-500">
-                <span className="font-medium">Risk notes:</span>{" "}
+                <span className="font-medium">{t.nextMove.riskNotes}</span>{" "}
                 {analysis.risk_notes}
               </p>
             )}
@@ -290,13 +283,13 @@ export default function NextMovePage() {
           {/* Drafted response */}
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Drafted response — review &amp; edit before sending
+              {t.nextMove.draftedResponse}
             </div>
 
             <div className="mt-3 grid gap-4 lg:grid-cols-2">
               {/* Email-style */}
               <div>
-                <div className="text-xs font-medium text-slate-500">Email style</div>
+                <div className="text-xs font-medium text-slate-500">{t.nextMove.emailStyle}</div>
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
@@ -308,17 +301,17 @@ export default function NextMovePage() {
                   className="mt-2 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
                 <button
-                  onClick={() => copy(`Subject: ${subject}\n\n${body}`, "Email")}
+                  onClick={() => copy(`Subject: ${subject}\n\n${body}`, t.nextMove.whatEmail)}
                   className="mt-2 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  Copy email
+                  {t.nextMove.copyEmail}
                 </button>
               </div>
 
               {/* Short-message style */}
               <div>
                 <div className="text-xs font-medium text-slate-500">
-                  LinkedIn / chat style
+                  {t.nextMove.linkedinStyle}
                 </div>
                 <textarea
                   value={shortMsg}
@@ -326,10 +319,10 @@ export default function NextMovePage() {
                   className="mt-1 h-44 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
                 <button
-                  onClick={() => copy(shortMsg, "Message")}
+                  onClick={() => copy(shortMsg, t.nextMove.whatMessage)}
                   className="mt-2 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  Copy message
+                  {t.nextMove.copyMessage}
                 </button>
               </div>
             </div>
@@ -344,13 +337,13 @@ export default function NextMovePage() {
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                After you send your reply — log the outcome
+                {t.nextMove.logOutcome}
               </div>
               {analysis.suggested_pipeline_update && (
                 <span className="text-xs text-slate-500">
-                  Suggested:{" "}
+                  {t.nextMove.suggestedLabel}{" "}
                   <span className="font-medium text-slate-700">
-                    {label(analysis.suggested_pipeline_update)}
+                    {(t.ui.outcome as Record<string, string>)[analysis.suggested_pipeline_update] ?? label(analysis.suggested_pipeline_update)}
                   </span>
                 </span>
               )}
@@ -358,13 +351,15 @@ export default function NextMovePage() {
 
             {!canLogOutcome ? (
               <p className="mt-2 text-sm text-slate-500">
-                Link a pipeline item above (a message or email) to log the outcome.
-                Without a linked item you can still copy and send
-                the draft manually.
+                {t.nextMove.linkToLog}
               </p>
             ) : (
               <div className="mt-2 flex flex-wrap gap-2">
-                {OUTCOME_BUTTONS.map((b) => {
+                {([
+                  { outcome: "replied", label: t.nextMove.markReplied },
+                  { outcome: "referral_received", label: t.nextMove.markReferral },
+                  { outcome: "interview_received", label: t.nextMove.markInterview },
+                ] as { outcome: string; label: string }[]).map((b) => {
                   const suggested =
                     analysis.suggested_pipeline_update === b.outcome;
                   return (
@@ -385,8 +380,7 @@ export default function NextMovePage() {
               </div>
             )}
             <p className="mt-3 text-xs text-slate-400">
-              Logging an outcome updates your pipeline. Nothing is sent for you;
-              you send your reply manually.
+              {t.nextMove.loggingNote}
             </p>
           </section>
         </div>

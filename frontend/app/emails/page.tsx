@@ -10,8 +10,10 @@ import {
   LimitsWarning,
 } from "@/components/ui";
 import EmailDraftCard from "@/components/EmailDraftCard";
+import { useT } from "@/lib/i18n";
 
 export default function EmailsPage() {
+  const t = useT();
   const [emails, setEmails] = useState<EmailDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export default function EmailsPage() {
       try {
         setEmails(await api.getEmails());
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load emails");
+        setError(e instanceof Error ? e.message : t.emails.loadFailed);
       } finally {
         setLoading(false);
       }
@@ -39,14 +41,10 @@ export default function EmailsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Email approval queue"
-        subtitle="AI proposes; you decide. Review why each contact and message is relevant, edit freely, then approve and send manually."
-      />
+      <PageHeader title={t.emails.title} subtitle={t.emails.subtitle} />
 
       <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-        🔒 Nothing is sent without your approval. No scraping, no auto-send, no
-        bulk sending — Gmail sending is disabled by default.
+        {t.emails.lockNote}
       </div>
 
       <div className="mt-4">
@@ -56,14 +54,14 @@ export default function EmailsPage() {
       <ErrorBanner message={error} />
 
       {loading ? (
-        <p className="mt-6 text-sm text-slate-500">Loading…</p>
+        <p className="mt-6 text-sm text-slate-500">{t.common.loading}</p>
       ) : emails.length === 0 ? (
         <div className="mt-6">
           <EmptyState
-            title="No email drafts yet"
-            description="Pick an opportunity, add a contact, and draft outreach — drafts land here for review and approval."
+            title={t.emails.emptyTitle}
+            description={t.emails.emptyDesc}
             ctaHref="/opportunities"
-            ctaLabel="Browse opportunities →"
+            ctaLabel={t.pipeline.emptyCta}
           />
         </div>
       ) : (

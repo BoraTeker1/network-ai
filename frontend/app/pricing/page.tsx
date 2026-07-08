@@ -5,8 +5,10 @@ import Link from "next/link";
 import { api, PricingPlan } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button, Card, PageHeader, Pill } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export default function PricingPage() {
+  const t = useT();
   const { user } = useAuth();
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [paymentsLive, setPaymentsLive] = useState(false);
@@ -37,7 +39,7 @@ export default function PricingPage() {
         window.open(r.url, "_blank", "noopener,noreferrer");
       }
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Something went wrong.");
+      setNotice(e instanceof Error ? e.message : t.pricing.wentWrong);
     } finally {
       setBusy(false);
     }
@@ -45,22 +47,15 @@ export default function PricingPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader
-        title="Pricing"
-        subtitle="Try the whole loop free. Upgrade when the limits get in your way."
-      />
+      <PageHeader title={t.pricing.title} subtitle={t.pricing.subtitle} />
 
       {paymentsLive ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-          <strong>Early-access beta:</strong> payment happens on our provider&apos;s
-          secure checkout page — we never see your card. Pay with your account
-          email and Pro is activated on that account within a few hours.
+          <strong>{t.pricing.betaLabel}</strong>{t.pricing.liveText}
         </div>
       ) : (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <strong>Early-access beta:</strong> payments aren&apos;t live yet. Pro is
-          granted manually to beta users — the button below tells you exactly that.
-          No card fields, no fake checkout.
+          <strong>{t.pricing.betaLabel}</strong>{t.pricing.notLiveText}
         </div>
       )}
 
@@ -72,12 +67,12 @@ export default function PricingPage() {
             <Card key={p.id} className={`p-5 ${isPro ? "border-blue-300" : ""}`}>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">{p.name}</h2>
-                {isPro && <Pill tone="blue">Recommended</Pill>}
-                {isCurrent && <Pill tone="green">Your plan</Pill>}
+                {isPro && <Pill tone="blue">{t.pricing.recommended}</Pill>}
+                {isCurrent && <Pill tone="green">{t.pricing.yourPlan}</Pill>}
               </div>
               <div className="mt-2 text-3xl font-bold text-slate-900">
                 ${p.price_monthly_usd}
-                <span className="text-sm font-normal text-slate-500"> / month</span>
+                <span className="text-sm font-normal text-slate-500">{t.pricing.perMonth}</span>
               </div>
               <ul className="mt-4 space-y-1.5">
                 {p.features.map((f) => (
@@ -91,14 +86,14 @@ export default function PricingPage() {
                 {isPro ? (
                   user ? (
                     <Button onClick={upgrade} disabled={busy || isCurrent} className="w-full">
-                      {isCurrent ? "You're on Pro" : busy ? "Checking…" : "Upgrade to Pro"}
+                      {isCurrent ? t.pricing.onPro : busy ? t.pricing.checking : t.pricing.upgradeToPro}
                     </Button>
                   ) : (
                     <Link
                       href="/signup"
                       className="block w-full rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
                     >
-                      Sign up first
+                      {t.pricing.signupFirst}
                     </Link>
                   )
                 ) : (
@@ -106,7 +101,7 @@ export default function PricingPage() {
                     href={user ? "/opportunities" : "/signup"}
                     className="block w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    {user ? "You have Free" : "Start free"}
+                    {user ? t.pricing.youHaveFree : t.pricing.startFree}
                   </Link>
                 )}
               </div>
@@ -121,12 +116,11 @@ export default function PricingPage() {
 
       {/* Privacy & trust — the promise that differentiates the product. */}
       <Card className="p-4">
-        <h3 className="text-sm font-semibold text-slate-900">Privacy &amp; trust</h3>
+        <h3 className="text-sm font-semibold text-slate-900">{t.pricing.privacyTitle}</h3>
         <ul className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
-          <li>· Your résumé, drafts, and pipeline are private to your account.</li>
-          <li>· No scraping — roles come from official public company APIs.</li>
-          <li>· No auto-send, ever. You review, copy, and send everything.</li>
-          <li>· No guarantees of jobs or interviews — a copilot, not a promise.</li>
+          {t.pricing.privacyPoints.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
         </ul>
       </Card>
     </div>

@@ -11,22 +11,13 @@ import {
   TrustLine,
 } from "@/components/ui";
 import UpgradeCallout from "@/components/UpgradeCallout";
+import { useT } from "@/lib/i18n";
 
 type Language = "en" | "tr";
 type Channel = "email" | "linkedin";
 type Region = "remote" | "europe" | "global" | "turkey";
 
-const LANG_LABEL: Record<Language, string> = { en: "English", tr: "Türkçe" };
-const CHANNEL_LABEL: Record<Channel, string> = {
-  email: "Email",
-  linkedin: "LinkedIn note",
-};
-const REGION_LABEL: Record<Region, string> = {
-  remote: "Remote",
-  europe: "Europe",
-  global: "Global",
-  turkey: "Turkey",
-};
+
 
 function Toggle<T extends string>({
   value,
@@ -60,12 +51,13 @@ function Toggle<T extends string>({
 }
 
 function RiskChecklist({ checklist }: { checklist: Checklist }) {
+  const t = useT();
   return (
     <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
       <div className="flex items-center justify-between">
-        <SectionLabel>Risk checklist</SectionLabel>
+        <SectionLabel>{t.outreach.riskChecklist}</SectionLabel>
         <span className="text-xs font-medium text-green-700">
-          {checklist.passed}/{checklist.total} passed
+          {t.ui.checklistPassed(checklist.passed, checklist.total)}
         </span>
       </div>
       <ul className="mt-2 grid gap-1 sm:grid-cols-2">
@@ -89,6 +81,7 @@ const input =
   "rounded-md border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none";
 
 export default function OutreachPage() {
+  const t = useT();
   const [jdText, setJdText] = useState("");
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
@@ -154,7 +147,7 @@ export default function OutreachPage() {
         setRegion(p.target_region);
       if (typeof p.include_location_line === "boolean")
         setIncludeLocation(p.include_location_line);
-      setNotice("Prefilled from the opportunity feed — review and draft.");
+      setNotice(t.outreach.prefilledNotice);
     } catch {
       /* ignore malformed prefill */
     }
@@ -176,7 +169,7 @@ export default function OutreachPage() {
 
   async function saveContact() {
     if (!name.trim()) {
-      setError("Add the contact's name first (find one via the search links).");
+      setError(t.outreach.addContactFirst);
       return;
     }
     setError(null);
@@ -188,15 +181,15 @@ export default function OutreachPage() {
         source_note: "Found via the outreach copilot's search links.",
       });
       setContactSaved(true);
-      setNotice("Saved to your contacts.");
+      setNotice(t.outreach.contactSavedNotice);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't save the contact.");
+      setError(e instanceof Error ? e.message : t.outreach.contactSaveFailed);
     }
   }
 
   async function generate() {
     if (!jdText.trim()) {
-      setError("Paste a job description first.");
+      setError(t.outreach.pasteJdFirst);
       return;
     }
     setLoading(true);
@@ -222,7 +215,7 @@ export default function OutreachPage() {
       setBody(result.body);
       setSavedId(null); // a fresh draft hasn't been saved yet
     } catch (e) {
-      handleApiError(e, "Failed to draft outreach.");
+      handleApiError(e, t.outreach.draftFailed);
     } finally {
       setLoading(false);
     }
@@ -247,9 +240,9 @@ export default function OutreachPage() {
         status: "copied",
       });
       setSavedId(saved.id);
-      setNotice("Saved to your pipeline — track it there.");
+      setNotice(t.outreach.savedPipelineNotice);
     } catch (e) {
-      handleApiError(e, "Couldn't save to pipeline.");
+      handleApiError(e, t.outreach.savePipelineFailed);
     } finally {
       setSaving(false);
     }
@@ -259,40 +252,37 @@ export default function OutreachPage() {
     const text = subject ? `Subject: ${subject}\n\n${body}` : body;
     try {
       await navigator.clipboard.writeText(text);
-      setNotice("Copied. Send it yourself from your own inbox/LinkedIn.");
+      setNotice(t.outreach.copiedNotice);
     } catch {
-      setNotice("Couldn't access the clipboard — select and copy manually.");
+      setNotice(t.outreach.clipboardFailed);
     }
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
-      <PageHeader
-        title="Outreach copilot"
-        subtitle="For Turkish engineers targeting Turkey, remote, European, or global roles. Paste a job you found (or start one from Opportunities), find the right people to contact in two clicks, then get an honest, low-pressure draft in English or Turkish — personalized with your saved profile skills."
-      />
+      <PageHeader title={t.outreach.title} subtitle={t.outreach.subtitle} />
 
       <TrustLine />
 
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
           <label className="text-sm font-medium text-slate-700">
-            Job description (paste it yourself — no scraping)
+            {t.outreach.jdLabel}
           </label>
           <textarea
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
             rows={7}
-            placeholder="Paste the full job posting here…"
+            placeholder={t.outreach.jdPlaceholder}
             className={`mt-1 w-full ${input}`}
           />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <input value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => loadGuidance()} placeholder="Company" className={input} />
-          <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role title (optional)" className={input} />
-          <input value={name} onChange={(e) => { setName(e.target.value); setContactSaved(false); }} placeholder="Contact name" className={input} />
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Their title (optional)" className={input} />
+          <input value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => loadGuidance()} placeholder={t.outreach.companyPh} className={input} />
+          <input value={role} onChange={(e) => setRole(e.target.value)} placeholder={t.outreach.rolePh} className={input} />
+          <input value={name} onChange={(e) => { setName(e.target.value); setContactSaved(false); }} placeholder={t.outreach.namePh} className={input} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.outreach.titlePh} className={input} />
         </div>
 
         {/* Who to contact — surfaced BEFORE drafting so the user finds a real
@@ -301,7 +291,7 @@ export default function OutreachPage() {
           <div className="space-y-3 rounded-md border border-blue-100 bg-blue-50/50 p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-slate-900">
-                Who to contact{guidance?.company ? ` at ${guidance.company}` : ""}
+                {t.outreach.whoToContact(guidance?.company ?? "")}
               </h3>
               {name.trim() && (
                 <button
@@ -309,12 +299,12 @@ export default function OutreachPage() {
                   onClick={saveContact}
                   className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  {contactSaved ? "Saved ✓" : "Save to my contacts"}
+                  {contactSaved ? t.outreach.savedTick : t.outreach.saveContact}
                 </button>
               )}
             </div>
             {guidanceLoading && !guidance ? (
-              <p className="text-xs text-slate-500">Finding the right roles…</p>
+              <p className="text-xs text-slate-500">{t.outreach.findingRoles}</p>
             ) : guidance ? (
               <>
                 <p className="text-xs text-slate-500">{guidance.note}</p>
@@ -335,7 +325,7 @@ export default function OutreachPage() {
                     ))}
                 </ol>
                 <div>
-                  <SectionLabel>Search for a name, then paste it above</SectionLabel>
+                  <SectionLabel>{t.outreach.searchForName}</SectionLabel>
                   <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                     {guidance.manual_search_links.map((l) => (
                       <li key={l.url}>
@@ -353,25 +343,25 @@ export default function OutreachPage() {
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <SectionLabel>Language</SectionLabel>
+            <SectionLabel>{t.outreach.languageLabel}</SectionLabel>
             <Toggle
               value={language}
               options={["en", "tr"]}
               onChange={(l) => { setLanguage(l); if (guidance) loadGuidance(company, l); }}
-              labels={LANG_LABEL}
+              labels={t.outreach.language}
             />
           </div>
           <div className="flex items-center gap-2">
-            <SectionLabel>Channel</SectionLabel>
-            <Toggle value={channel} options={["email", "linkedin"]} onChange={setChannel} labels={CHANNEL_LABEL} />
+            <SectionLabel>{t.outreach.channelLabel}</SectionLabel>
+            <Toggle value={channel} options={["email", "linkedin"]} onChange={setChannel} labels={t.outreach.channel} />
           </div>
           <div className="flex items-center gap-2">
-            <SectionLabel>Target</SectionLabel>
+            <SectionLabel>{t.outreach.targetLabel}</SectionLabel>
             <Toggle
               value={region}
               options={["remote", "europe", "global", "turkey"]}
               onChange={setRegion}
-              labels={REGION_LABEL}
+              labels={t.opportunities.region as Record<Region, string>}
             />
           </div>
         </div>
@@ -379,32 +369,32 @@ export default function OutreachPage() {
         <div className="space-y-2 rounded-md border border-slate-100 bg-slate-50 p-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={includeLocation} onChange={(e) => setIncludeLocation(e.target.checked)} />
-            Add a “based in Turkey / CET-compatible hours” line
+            {t.outreach.locationLine}
           </label>
           {includeLocation && (
             <input
               value={timezoneOverlap}
               onChange={(e) => setTimezoneOverlap(e.target.value)}
-              placeholder="Timezone note (optional, e.g. Istanbul time with CET overlap)"
+              placeholder={t.outreach.timezonePh}
               className={`w-full ${input}`}
             />
           )}
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={includeWorkAuth} onChange={(e) => setIncludeWorkAuth(e.target.checked)} />
-            Include a work-authorization note (your own words only)
+            {t.outreach.workAuthLine}
           </label>
           {includeWorkAuth && (
             <input
               value={workAuthNote}
               onChange={(e) => setWorkAuthNote(e.target.value)}
-              placeholder="e.g. EU citizen, no sponsorship needed — only what's true for you"
+              placeholder={t.outreach.workAuthPh}
               className={`w-full ${input}`}
             />
           )}
           <input
             value={skillHighlight}
             onChange={(e) => setSkillHighlight(e.target.value)}
-            placeholder="Optional: your own skill/project highlight line (overrides the auto one)"
+            placeholder={t.outreach.skillPh}
             className={`w-full ${input}`}
           />
         </div>
@@ -415,7 +405,7 @@ export default function OutreachPage() {
             disabled={loading}
             className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? "Drafting…" : "Draft outreach"}
+            {loading ? t.outreach.drafting : t.outreach.draftBtn}
           </button>
         </div>
 
@@ -428,11 +418,11 @@ export default function OutreachPage() {
           {/* 1. Draft message */}
           <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{LANG_LABEL[draft.language]}</span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{CHANNEL_LABEL[draft.channel]}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{t.outreach.language[draft.language]}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{t.outreach.channel[draft.channel]}</span>
               {draft.target_region && (
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                  {REGION_LABEL[draft.target_region as Region] ?? draft.target_region}
+                  {(t.opportunities.region as Record<string, string>)[draft.target_region] ?? draft.target_region}
                 </span>
               )}
               <span
@@ -440,22 +430,22 @@ export default function OutreachPage() {
                   draft.llm_used ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-500"
                 }`}
               >
-                {draft.llm_used ? "AI-written (Claude)" : "Template (no AI key set)"}
+                {draft.llm_used ? t.outreach.aiWritten : t.outreach.templateNoKey}
               </span>
               {draft.relevant_skills.length > 0 && (
-                <span className="text-slate-500">skills: {draft.relevant_skills.join(", ")}</span>
+                <span className="text-slate-500">{t.outreach.skillsUsed(draft.relevant_skills.join(", "))}</span>
               )}
             </div>
 
             {draft.channel === "email" && (
               <div>
-                <SectionLabel>Subject</SectionLabel>
+                <SectionLabel>{t.outreach.subject}</SectionLabel>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} className={`mt-1 w-full ${input}`} />
               </div>
             )}
 
             <div>
-              <SectionLabel>Message — edit before you send</SectionLabel>
+              <SectionLabel>{t.outreach.messageEdit}</SectionLabel>
               <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className={`mt-1 w-full ${input}`} />
             </div>
 
@@ -465,7 +455,7 @@ export default function OutreachPage() {
                   href="/pipeline"
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  Saved ✓ · View in pipeline →
+                  {t.outreach.savedView}
                 </Link>
               ) : (
                 <button
@@ -473,11 +463,11 @@ export default function OutreachPage() {
                   disabled={saving}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {saving ? "Saving…" : "Save to pipeline"}
+                  {saving ? t.common.saving : t.outreach.saveToPipeline}
                 </button>
               )}
               <button onClick={copy} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50">
-                Copy message
+                {t.outreach.copyMessage}
               </button>
               {notice && <span className="text-sm text-green-700">{notice}</span>}
             </div>
@@ -495,7 +485,7 @@ export default function OutreachPage() {
 
           {/* Follow-up timing (who-to-contact is shown up-front, above the draft) */}
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <SectionLabel>Suggested follow-up</SectionLabel>
+            <SectionLabel>{t.outreach.suggestedFollowUp}</SectionLabel>
             <p className="mt-1 text-sm text-amber-900">{draft.suggested_follow_up}</p>
           </div>
         </>

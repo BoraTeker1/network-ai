@@ -7,6 +7,7 @@ import {
   OUTCOMES,
   FOLLOW_UP_STATUSES,
 } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import {
   StatusBadge,
   OutcomeBadge,
@@ -29,6 +30,7 @@ export default function EmailDraftCard({
   email: EmailDraft;
   onUpdated: (e: EmailDraft) => void;
 }) {
+  const t = useT();
   const [subject, setSubject] = useState(email.subject ?? "");
   const [body, setBody] = useState(email.body ?? "");
   const [busy, setBusy] = useState(false);
@@ -43,10 +45,10 @@ export default function EmailDraftCard({
   const charLimit = isConnection ? 300 : 600;
   const overLimit = isLinkedIn && body.length > charLimit;
   const channelLabel = isConnection
-    ? "LinkedIn connection note"
+    ? t.emailCard.channelConnection
     : isLinkedIn
-    ? "LinkedIn message"
-    : "email";
+    ? t.emailCard.channelMessage
+    : t.emailCard.channelEmail;
 
   async function run(fn: () => Promise<EmailDraft>) {
     setBusy(true);
@@ -55,7 +57,7 @@ export default function EmailDraftCard({
       const updated = await fn();
       onUpdated(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : t.emailCard.actionFailed);
     } finally {
       setBusy(false);
     }
@@ -78,7 +80,7 @@ export default function EmailDraftCard({
       const r = await api.sendEmailGmail(email.id, true);
       setGmailMsg(r.message);
     } catch (e) {
-      setGmailMsg(e instanceof Error ? e.message : "Gmail unavailable");
+      setGmailMsg(e instanceof Error ? e.message : t.emailCard.gmailUnavailable);
     } finally {
       setBusy(false);
     }
@@ -91,11 +93,11 @@ export default function EmailDraftCard({
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
             {isLinkedIn
-              ? `AI proposes a ${channelLabel}`
-              : "AI proposes emailing this person"}
+              ? t.emailCard.proposesChannel(channelLabel)
+              : t.emailCard.proposesEmail}
           </div>
           <div className="mt-0.5 text-sm font-semibold text-slate-900">
-            {email.contact_name || "Unknown contact"}
+            {email.contact_name || t.emailCard.unknownContact}
             {email.contact_title ? ` · ${email.contact_title}` : ""}
           </div>
           <div className="text-xs text-slate-500">
@@ -113,7 +115,7 @@ export default function EmailDraftCard({
                   : "bg-slate-100 text-slate-600"
               }`}
             >
-              {email.llm_used ? "✨ Written by AI" : "Template (no LLM)"}
+              {email.llm_used ? t.emailCard.writtenByAI : t.emailCard.template}
             </span>
             <StatusBadge status={email.status} />
           </div>
@@ -128,7 +130,7 @@ export default function EmailDraftCard({
       {/* Why this contact */}
       {email.contact_why_relevant && (
         <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
-          <span className="font-medium">Why this contact:</span>{" "}
+          <span className="font-medium">{t.emailCard.whyContact}</span>{" "}
           {email.contact_why_relevant}
         </p>
       )}
@@ -137,7 +139,7 @@ export default function EmailDraftCard({
       {!isLinkedIn && (
         <div className="mt-3">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Subject
+            {t.emailCard.subject}
           </label>
           <input
             value={subject}
@@ -150,13 +152,13 @@ export default function EmailDraftCard({
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           {isLinkedIn ? (
             <>
-              Message{" "}
+              {t.emailCard.message}{" "}
               <span className={overLimit ? "text-red-600" : "text-slate-400"}>
-                ({body.length}/{charLimit} chars)
+                {t.emailCard.chars(body.length, charLimit)}
               </span>
             </>
           ) : (
-            <>Body ({body.split(/\s+/).filter(Boolean).length} words)</>
+            <>{t.emailCard.bodyWords(body.split(/\s+/).filter(Boolean).length)}</>
           )}
         </label>
         <textarea
@@ -171,15 +173,15 @@ export default function EmailDraftCard({
         {overLimit && (
           <p className="mt-1 text-xs text-red-600">
             {isConnection
-              ? "LinkedIn rejects connection notes over 300 characters — trim before copying."
-              : "This is longer than recommended for a LinkedIn message — consider trimming."}
+              ? t.emailCard.overLimitConnection
+              : t.emailCard.overLimitMessage}
           </p>
         )}
       </div>
 
       {email.personalization_notes && (
         <p className="mt-2 text-xs text-slate-500">
-          <span className="font-medium">Personalization notes:</span>{" "}
+          <span className="font-medium">{t.emailCard.personalizationNotes}</span>{" "}
           {email.personalization_notes}
         </p>
       )}
@@ -189,13 +191,13 @@ export default function EmailDraftCard({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {email.why_safe && (
             <p className="rounded-md bg-green-50 p-2 text-xs text-green-800">
-              <span className="font-medium">🛡️ Why this is safe:</span>{" "}
+              <span className="font-medium">{t.emailCard.whySafe}</span>{" "}
               {email.why_safe}
             </p>
           )}
           {email.suggested_next_step && (
             <p className="rounded-md bg-blue-50 p-2 text-xs text-blue-800">
-              <span className="font-medium">→ Suggested next step:</span>{" "}
+              <span className="font-medium">{t.emailCard.suggestedNext}</span>{" "}
               {email.suggested_next_step}
             </p>
           )}
@@ -221,44 +223,44 @@ export default function EmailDraftCard({
           onClick={() => run(() => api.patchEmail(email.id, { subject, body }))}
           className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:border-blue-400 disabled:opacity-50"
         >
-          Save Edit
+          {t.emailCard.saveEdit}
         </button>
         <button
           disabled={busy}
           onClick={() => run(() => api.approveEmail(email.id))}
           className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
         >
-          Approve
+          {t.emailCard.approve}
         </button>
         <button
           disabled={busy}
           onClick={() => run(() => api.rejectEmail(email.id))}
           className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
         >
-          Reject
+          {t.emailCard.reject}
         </button>
         <button
           disabled={busy}
           onClick={handleCopy}
           className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {isLinkedIn ? (isConnection ? "Copy note" : "Copy message") : "Copy Email"}
+          {isLinkedIn ? (isConnection ? t.emailCard.copyNote : t.emailCard.copyMessage) : t.emailCard.copyEmail}
         </button>
         <button
           disabled={busy}
           onClick={() => run(() => api.markEmailSentManual(email.id))}
           className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
         >
-          {isLinkedIn ? "Mark Sent on LinkedIn" : "Mark Sent Manually"}
+          {isLinkedIn ? t.emailCard.markSentLinkedIn : t.emailCard.markSentManually}
         </button>
         {/* Gmail send only applies to email drafts. */}
         {!isLinkedIn && (
           <button
             onClick={handleGmail}
-            title="Gmail sending requires OAuth configuration. Manual copy is available."
+            title={t.emailCard.gmailTooltip}
             className="cursor-not-allowed rounded border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-400"
           >
-            Send via Gmail (disabled)
+            {t.emailCard.gmailDisabled}
           </button>
         )}
       </div>
@@ -271,7 +273,7 @@ export default function EmailDraftCard({
       {/* Outcome + follow-up tracking */}
       <div className="mt-3 border-t border-slate-100 pt-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          After you reach out — track it
+          {t.emailCard.trackHeader}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {OUTCOMES.map((o) => (
@@ -285,7 +287,7 @@ export default function EmailDraftCard({
                   : "border-slate-300 text-slate-600 hover:border-blue-400"
               }`}
             >
-              {o.replace(/_/g, " ")}
+              {(t.ui.outcome as Record<string, string>)[o] ?? o.replace(/_/g, " ")}
             </button>
           ))}
         </div>
@@ -309,7 +311,7 @@ export default function EmailDraftCard({
                   : "border-slate-300 text-slate-600 hover:border-amber-400"
               }`}
             >
-              {s.replace(/_/g, " ")}
+              {(t.ui.followUp as Record<string, string>)[s] ?? s.replace(/_/g, " ")}
             </button>
           ))}
         </div>

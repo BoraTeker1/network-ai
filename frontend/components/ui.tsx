@@ -1,8 +1,11 @@
+"use client";
+
 // Small shared UI primitives used across pages — kept deliberately tiny.
 
 import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { Checklist } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 /** Standard surface card — soft border + subtle shadow for a calm SaaS feel. */
 export function Card({
@@ -27,11 +30,11 @@ export function Card({
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50",
+  primary: "rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50",
   secondary:
-    "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50",
-  ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50",
-  danger: "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-50",
+    "rounded-full border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50",
+  ghost: "rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50",
+  danger: "rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-50",
 };
 
 /** Consistent button. `size="sm"` for inline card actions. */
@@ -48,7 +51,7 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${sizing} ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 font-medium transition-colors ${sizing} ${BUTTON_VARIANTS[variant]} ${className}`}
     />
   );
 }
@@ -56,7 +59,7 @@ export function Button({
 type PillTone = "neutral" | "blue" | "green" | "amber" | "rose" | "violet";
 const PILL_TONES: Record<PillTone, string> = {
   neutral: "bg-slate-100 text-slate-600",
-  blue: "bg-blue-50 text-blue-700",
+  blue: "bg-brand-50 text-brand-700",
   green: "bg-green-100 text-green-800",
   amber: "bg-amber-100 text-amber-800",
   rose: "bg-rose-100 text-rose-700",
@@ -100,8 +103,8 @@ export function SectionHeader({
 /** Slim, one-line hint that makes the core loop obvious at the top of a page. */
 export function WorkflowHint({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm text-blue-900">
-      <span aria-hidden className="text-blue-500">
+    <div className="flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-sm text-brand-900">
+      <span aria-hidden className="text-brand-500">
         →
       </span>
       <span>{children}</span>
@@ -111,11 +114,11 @@ export function WorkflowHint({ children }: { children: ReactNode }) {
 
 /** Compact one-line trust note — the anti-spam promise without dominating a page. */
 export function TrustLine() {
+  const t = useT();
   return (
     <p className="flex items-center gap-1.5 text-xs text-slate-500">
       <span className="text-green-600">🛡️</span>
-      Copilot, not autopilot — nothing is scraped, auto-sent, or sent in bulk. You review,
-      copy, and send everything yourself.
+      {t.ui.trustLine}
     </p>
   );
 }
@@ -139,7 +142,7 @@ export function EmptyState({
       {ctaHref && ctaLabel && (
         <Link
           href={ctaHref}
-          className="mt-4 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="mt-4 inline-block rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
           {ctaLabel}
         </Link>
@@ -162,20 +165,21 @@ const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-600",
   approved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-700",
-  copied: "bg-blue-100 text-blue-800",
+  copied: "bg-panel-100 text-panel-800",
   sent_manually: "bg-purple-100 text-purple-800",
   sent_manual: "bg-purple-100 text-purple-800",
   sent_via_gmail: "bg-purple-100 text-purple-800",
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const t = useT();
   return (
     <span
       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
         STATUS_STYLES[status] ?? "bg-slate-100 text-slate-600"
       }`}
     >
-      {status.replace(/_/g, " ")}
+      {(t.ui.status as Record<string, string>)[status] ?? status.replace(/_/g, " ")}
     </span>
   );
 }
@@ -190,13 +194,14 @@ const OUTCOME_STYLES: Record<string, string> = {
 };
 
 export function OutcomeBadge({ outcome }: { outcome: string }) {
+  const t = useT();
   return (
     <span
       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
         OUTCOME_STYLES[outcome] ?? "bg-slate-100 text-slate-600"
       }`}
     >
-      {outcome.replace(/_/g, " ")}
+      {(t.ui.outcome as Record<string, string>)[outcome] ?? outcome.replace(/_/g, " ")}
     </span>
   );
 }
@@ -270,7 +275,7 @@ export function ToneBadge({ tone }: { tone: string }) {
 
 const FOLLOW_UP_STYLES: Record<string, string> = {
   follow_up_needed: "bg-amber-100 text-amber-800",
-  followed_up: "bg-blue-100 text-blue-800",
+  followed_up: "bg-panel-100 text-panel-800",
   no_response: "bg-slate-100 text-slate-500",
 };
 
@@ -281,14 +286,16 @@ export function FollowUpBadge({
   status: string | null;
   dueDate?: string | null;
 }) {
+  const t = useT();
   if (!status) {
     return (
       <span className="rounded-full bg-slate-50 px-2 py-0.5 text-xs text-slate-400">
-        No follow-up yet
+        {t.ui.noFollowUp}
       </span>
     );
   }
-  const label = status.replace(/_/g, " ");
+  const label =
+    (t.ui.followUp as Record<string, string>)[status] ?? status.replace(/_/g, " ");
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -296,20 +303,21 @@ export function FollowUpBadge({
       }`}
     >
       {label}
-      {status === "follow_up_needed" && dueDate ? ` · due ${dueDate}` : ""}
+      {status === "follow_up_needed" && dueDate ? t.ui.dueDate(dueDate) : ""}
     </span>
   );
 }
 
 /** Prominent "next best action" callout used on match cards / job detail. */
 export function NextBestAction({ text }: { text: string | null | undefined }) {
+  const t = useT();
   if (!text) return null;
   return (
-    <div className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3">
-      <span className="mt-0.5 text-blue-600">→</span>
+    <div className="flex items-start gap-2 rounded-md border border-brand-100 bg-brand-50 p-3">
+      <span className="mt-0.5 text-brand-600">→</span>
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-          Next best action
+        <div className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+          {t.ui.nextBestAction}
         </div>
         <p className="mt-0.5 text-sm text-slate-700">{text}</p>
       </div>
@@ -317,23 +325,15 @@ export function NextBestAction({ text }: { text: string | null | undefined }) {
   );
 }
 
-const SPAM_POINTS = [
-  "Every message requires your explicit approval before it's used.",
-  "Manual copy & send only — nothing is ever sent on your behalf.",
-  "No LinkedIn scraping; contact search links are opened by you.",
-  "No bulk sending and no browser automation.",
-  "A quality checklist flags fake personalization and weak asks.",
-  "Outcome + follow-up tracking rewards quality over volume.",
-];
-
 /** The trust panel — why Network AI is a copilot, not a spam tool. */
 export function WhyNotSpam({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
         <span className="text-base">🛡️</span>
         <h3 className="text-sm font-semibold text-slate-900">
-          Why this is not a spam tool
+          {t.ui.whyNotSpamTitle}
         </h3>
       </div>
       <ul
@@ -341,7 +341,7 @@ export function WhyNotSpam({ compact = false }: { compact?: boolean }) {
           compact ? "" : "sm:grid-cols-2"
         }`}
       >
-        {SPAM_POINTS.map((p) => (
+        {t.ui.spamPoints.map((p) => (
           <li key={p} className="flex items-start gap-1.5 text-xs text-slate-600">
             <span className="mt-0.5 text-green-600">✓</span>
             <span>{p}</span>
@@ -364,22 +364,19 @@ export function LimitsWarning({
   contactsForCompany?: number;
   emailsToday?: number;
 }) {
+  const t = useT();
   const warnings: string[] = [];
   if ((contactsForCompany ?? 0) > MAX_CONTACTS_PER_COMPANY) {
-    warnings.push(
-      `You've added more than ${MAX_CONTACTS_PER_COMPANY} contacts for this company. Keep outreach focused — quality over volume.`
-    );
+    warnings.push(t.ui.tooManyContacts(MAX_CONTACTS_PER_COMPANY));
   }
   if ((emailsToday ?? 0) > MAX_EMAILS_PER_DAY) {
-    warnings.push(
-      `You've drafted more than ${MAX_EMAILS_PER_DAY} emails today. Slow down and personalize — this MVP is built for thoughtful outreach, not blasting.`
-    );
+    warnings.push(t.ui.tooManyEmails(MAX_EMAILS_PER_DAY));
   }
   if (warnings.length === 0) return null;
   return (
     <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
       <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-        Heads up
+        {t.ui.headsUp}
       </div>
       <ul className="mt-1 space-y-1">
         {warnings.map((w) => (
@@ -394,19 +391,20 @@ export function LimitsWarning({
 
 /** Renders the deterministic message-quality checklist. */
 export function QualityChecklist({ checklist }: { checklist: Checklist }) {
+  const t = useT();
   const allPassed = checklist.passed === checklist.total;
   return (
     <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Quality checklist
+          {t.ui.qualityChecklist}
         </span>
         <span
           className={`text-xs font-medium ${
             allPassed ? "text-green-700" : "text-amber-700"
           }`}
         >
-          {checklist.passed}/{checklist.total} passed
+          {t.ui.checklistPassed(checklist.passed, checklist.total)}
         </span>
       </div>
       <ul className="mt-2 grid gap-1 sm:grid-cols-2">

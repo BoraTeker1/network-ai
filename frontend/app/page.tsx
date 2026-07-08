@@ -1,6 +1,7 @@
 "use client";
 
-// Turkish landing page for first-time (logged-out) visitors. Logged-in users
+// Landing page for first-time (logged-out) visitors — Turkish by default,
+// switchable to English via the LandingNav toggle. Logged-in users
 // skip it and land on /opportunities, the start of the product loop. The page
 // is public (RouteGuard allows "/"); auth state comes from the client-side
 // AuthProvider, so the redirect happens after /auth/me resolves.
@@ -10,46 +11,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Card } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 /* ----------------------------- Copy ----------------------------- */
 
-const VALUE_CARDS = [
-  {
-    icon: "search",
-    title: "Gerçekçi rolleri bul",
-    body: "Türkiye’den başvurulabilecek junior, staj ve remote/EU rollerini tek yerde gör.",
-  },
-  {
-    icon: "rank",
-    title: "Profiline göre sırala",
-    body: "CV’ndeki becerilerle hangi rollerin sana daha yakın olduğunu hızlıca anla.",
-  },
-  {
-    icon: "pencil",
-    title: "Dürüst outreach yaz",
-    body: "LinkedIn veya e-posta için Türkçe/İngilizce, düşük baskılı mesaj taslakları hazırla.",
-  },
-  {
-    icon: "board",
-    title: "Pipeline’da takip et",
-    body: "Kime yazdığını, ne zaman gönderdiğini ve cevap gelince sonraki adımı tek yerde takip et.",
-  },
-] as const;
-
-const STEPS = [
-  { n: 1, title: "CV’ni ekle", body: "Becerilerin otomatik çıkarılır." },
-  { n: 2, title: "Rol seç", body: "Uygunluk etiketleriyle birlikte." },
-  { n: 3, title: "Outreach taslağı oluştur", body: "TR/EN, düşük baskılı ton." },
-  { n: 4, title: "Pipeline’a kaydet", body: "Gönderimi ve cevabı takip et." },
-];
-
-const TRUST_BULLETS = [
-  "LinkedIn veya Kariyer.net scraping yapmaz.",
-  "Senin adına otomatik mesaj göndermez.",
-  "Toplu spam gönderimi yoktur.",
-  "Her mesajı sen inceler, düzenler ve gönderirsin.",
-  "CV ve mesaj verilerin kullanıcı hesabına özeldir.",
-];
+// Copy lives in lib/i18n (t.landing.*); only the per-card icons stay here,
+// zipped by index with t.landing.valueCards.
+const CARD_ICONS = ["search", "rank", "pencil", "board"] as const;
 
 /* --------------------------- Small bits --------------------------- */
 
@@ -76,7 +44,7 @@ function SecondaryCta({ children }: { children: React.ReactNode }) {
 }
 
 /** Tiny hand-drawn icons — no icon library. */
-function ValueIcon({ name }: { name: (typeof VALUE_CARDS)[number]["icon"] }) {
+function ValueIcon({ name }: { name: (typeof CARD_ICONS)[number] }) {
   const paths: Record<string, React.ReactNode> = {
     search: (
       <>
@@ -187,6 +155,7 @@ function MockStage({
 
 /** Static mini-dashboard: stages → roles → draft in one glance. */
 function ProductMockup() {
+  const t = useT();
   return (
     <div aria-hidden className="relative select-none" role="presentation">
       {/* soft glow behind the card */}
@@ -205,34 +174,34 @@ function ProductMockup() {
         <div className="space-y-3 p-4 pb-8">
           {/* pipeline stage tracker */}
           <div className="flex items-center gap-1.5">
-            <MockStage label="Taslak" count={4} />
+            <MockStage label={t.landing.mock.stageDraft} count={4} />
             <span className="text-slate-300">→</span>
-            <MockStage label="Gönderildi" count={3} active />
+            <MockStage label={t.landing.mock.stageSent} count={3} active />
             <span className="text-slate-300">→</span>
-            <MockStage label="Cevap" count={1} />
+            <MockStage label={t.landing.mock.stageReply} count={1} />
           </div>
 
           {/* today's opportunities */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Bugünün fırsatları
+                {t.landing.mock.todays}
               </span>
               <span className="text-[11px] font-medium text-blue-600">
-                12 yeni rol
+                {t.landing.mock.newRoles}
               </span>
             </div>
             <div className="space-y-1.5">
               <MockRoleRow
                 title="Backend Engineer Intern"
                 place="İstanbul"
-                badge="Türkiye’den uygun"
+                badge={t.landing.mock.badgeEligible}
                 badgeTone="green"
               />
               <MockRoleRow
                 title="Junior Software Engineer"
                 place="Remote / EU"
-                badge="Remote/EU"
+                badge={t.landing.mock.badgeRemoteEu}
                 badgeTone="blue"
               />
             </div>
@@ -242,18 +211,17 @@ function ProductMockup() {
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Outreach taslağı
+                {t.landing.mock.draftLabel}
               </span>
               <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                 TR / EN
               </span>
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-slate-600">
-              “Merhaba Deniz Bey, ilanınızın backend/Spring deneyimimle ilgili
-              olduğunu düşündüm…”
+              {t.landing.mock.draftQuote}
             </p>
             <p className="mt-1 text-[10px] text-slate-400">
-              Sen düzenler, sen gönderirsin.
+              {t.landing.mock.youSend}
             </p>
           </div>
 
@@ -268,11 +236,11 @@ function ProductMockup() {
               Junior Software Engineer
             </div>
             <div className="text-[10px] text-slate-500">
-              Cevap geldi · Next Move önerisi hazır
+              {t.landing.mock.replyRow}
             </div>
           </div>
           <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
-            Cevap ✓
+            {t.landing.mock.replyBadge}
           </span>
         </div>
         {/* cursor arrow */}
@@ -293,6 +261,7 @@ function ProductMockup() {
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const t = useT();
 
   useEffect(() => {
     if (!loading && user !== null) {
@@ -320,34 +289,27 @@ export default function LandingPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
-                Ücretsiz erken beta
+                {t.landing.badge}
               </span>
               <span className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                Türkiye → Remote/EU outreach copilotu
+                {t.landing.tagline}
               </span>
             </div>
             <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-              Türkiye’den global iş aramayı daha düzenli hale getir
+              {t.landing.heroTitle}
             </h1>
-            <p className="mt-4 max-w-xl text-slate-600">
-              NetworkAI; Türkiye, remote ve Avrupa’daki gerçekçi rolleri
-              bulmana, dürüst outreach mesajları hazırlamana ve başvurularını
-              tek yerde takip etmene yardımcı olur.
-            </p>
+            <p className="mt-4 max-w-xl text-slate-600">{t.landing.heroBody}</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <PrimaryCta>Ücretsiz başla</PrimaryCta>
-              <SecondaryCta>Giriş yap</SecondaryCta>
+              <PrimaryCta>{t.nav.landingCta}</PrimaryCta>
+              <SecondaryCta>{t.nav.login}</SecondaryCta>
               <Link
                 href="/opportunities"
                 className="text-sm font-medium text-blue-600 hover:underline"
               >
-                Fırsatları gör →
+                {t.landing.seeOpportunities}
               </Link>
             </div>
-            <p className="mt-4 text-xs text-slate-500">
-              Otomatik başvuru yok. Spam yok. Mesajları sen inceler, sen
-              gönderirsin.
-            </p>
+            <p className="mt-4 text-xs text-slate-500">{t.landing.heroNote}</p>
           </div>
           <ProductMockup />
         </div>
@@ -355,19 +317,18 @@ export default function LandingPage() {
 
       {/* Social proof (honest — no fake numbers) */}
       <p className="border-y border-slate-200 py-4 text-center text-sm text-slate-500">
-        Junior mühendisler için erken beta — gerçek kullanıcı geri bildirimiyle
-        geliştiriliyor.
+        {t.landing.socialProof}
       </p>
 
       {/* Value cards */}
       <section id="ozellikler" className="scroll-mt-20">
         <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-          Dağınık iş aramayı tek bir akışa çevir
+          {t.landing.valueTitle}
         </h2>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {VALUE_CARDS.map((c) => (
+          {t.landing.valueCards.map((c, i) => (
             <Card key={c.title} hover className="p-4">
-              <ValueIcon name={c.icon} />
+              <ValueIcon name={CARD_ICONS[i]} />
               <h3 className="mt-3 font-semibold text-slate-900">{c.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
                 {c.body}
@@ -380,21 +341,21 @@ export default function LandingPage() {
       {/* How it works — horizontal stepper on desktop, stacked on mobile */}
       <section id="nasil-calisir" className="scroll-mt-20">
         <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-          5 dakikada ilk mesajını hazırla
+          {t.landing.howTitle}
         </h2>
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-stretch md:gap-0">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="flex flex-1 items-center md:min-w-0">
+          {t.landing.steps.map((s, i) => (
+            <div key={s.title} className="flex flex-1 items-center md:min-w-0">
               <Card className="flex-1 p-4 md:min-w-0">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-                  {s.n}
+                  {i + 1}
                 </span>
                 <h3 className="mt-2.5 text-sm font-semibold text-slate-900">
                   {s.title}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">{s.body}</p>
               </Card>
-              {i < STEPS.length - 1 && (
+              {i < t.landing.steps.length - 1 && (
                 <span
                   aria-hidden
                   className="hidden shrink-0 px-2 text-lg text-slate-300 md:block"
@@ -411,13 +372,11 @@ export default function LandingPage() {
       <section id="guven" className="scroll-mt-20">
         <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 sm:p-8">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
-            Copilot, autopilot değil
+            {t.landing.trustTitle}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            NetworkAI sana öneri verir; son karar ve gönderim her zaman sende.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">{t.landing.trustBody}</p>
           <ul className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {TRUST_BULLETS.map((b) => (
+            {t.landing.trustBullets.map((b) => (
               <li
                 key={b}
                 className="flex items-start gap-2 text-sm text-slate-700"
@@ -438,26 +397,25 @@ export default function LandingPage() {
       {/* Final CTA */}
       <section className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-10 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          İlk outreach taslağını bugün hazırla
+          {t.landing.finalTitle}
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
-          CV’ni ekle, gerçekçi rolleri gör ve ilk mesajını birkaç dakika içinde
-          oluştur.
+          {t.landing.finalBody}
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-          <PrimaryCta>Ücretsiz başla</PrimaryCta>
+          <PrimaryCta>{t.nav.landingCta}</PrimaryCta>
           <Link
             href="/login"
             className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
           >
-            Giriş yap
+            {t.nav.login}
           </Link>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="border-t border-slate-200 pt-6 text-center text-xs text-slate-500">
-        NetworkAI — Türkiye’den global iş aramaya daha düzenli bir yol.
+        {t.landing.footerLine}
       </footer>
     </div>
   );
