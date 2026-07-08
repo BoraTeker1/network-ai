@@ -103,7 +103,13 @@ export const en = {
     manualSource: "manual",
     careers: "careers ↗",
     region: { all: "All regions", turkey: "Turkey", remote: "Remote", europe: "Europe", global: "Global" },
-    level: { all: "All levels", new_grad: "New grad", internship: "Internships", junior: "Junior" },
+    level: {
+      all: "All levels",
+      entry_level: "New grad / Junior",
+      new_grad: "New grad",
+      internship: "Internships",
+      junior: "Junior",
+    },
     field: { all: "All fields", software_engineering: "Engineering", business: "Business" },
     applicability: {
       all: "Eligible (default)",
@@ -118,6 +124,13 @@ export const en = {
       public_api: "Public API",
       manual_curated: "Manual",
       sample_demo: "Sample",
+    },
+    posted: {
+      all: "Posted: any time",
+      "1": "Last 24 hours",
+      "7": "Last week",
+      "30": "Last month",
+      "90": "Last 3 months",
     },
     remoteOnly: "Remote only",
     importedNotice: (created: number, succeeded: number, failed: number, skipped: number) =>

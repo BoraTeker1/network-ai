@@ -104,7 +104,13 @@ export const tr: Dict = {
     manualSource: "manuel",
     careers: "kariyer ↗",
     region: { all: "Tüm bölgeler", turkey: "Türkiye", remote: "Remote", europe: "Avrupa", global: "Global" },
-    level: { all: "Tüm seviyeler", new_grad: "Yeni mezun", internship: "Staj", junior: "Junior" },
+    level: {
+      all: "Tüm seviyeler",
+      entry_level: "Yeni mezun / Junior",
+      new_grad: "Yeni mezun",
+      internship: "Staj",
+      junior: "Junior",
+    },
     field: { all: "Tüm alanlar", software_engineering: "Mühendislik", business: "Business" },
     applicability: {
       all: "Uygun (varsayılan)",
@@ -119,6 +125,13 @@ export const tr: Dict = {
       public_api: "Halka açık API",
       manual_curated: "Manuel",
       sample_demo: "Örnek",
+    },
+    posted: {
+      all: "İlan tarihi: tümü",
+      "1": "Son 24 saat",
+      "7": "Son 1 hafta",
+      "30": "Son 1 ay",
+      "90": "Son 3 ay",
     },
     remoteOnly: "Sadece remote",
     importedNotice: (created: number, succeeded: number, failed: number, skipped: number) =>

@@ -209,9 +209,9 @@ def test_no_profile_leaves_match_empty(db_session):
 def test_live_sources_are_the_verified_set():
     live = {s["id"] for s in opp.list_sources() if s["live"]}
     assert live == {
-        # Turkish boards (Lever)
+        # Turkish boards (Lever + Greenhouse)
         "dreamgames", "codeway", "commencis", "trendyol", "peak", "midas",
-        "picus", "iyzico",
+        "picus", "iyzico", "goodjobgames",
         # Strong EU / global-remote boards (verified 2026-07-01)
         "canonical", "remotecom", "gitlab", "spotify", "adyen", "n26",
         "hellofresh", "celonis", "doctolib", "bitpanda", "typeform",
@@ -623,3 +623,108 @@ def test_dedupe_on_reimport(client):
     second = client.post("/opportunities/import", json=payload).json()
     assert first["created"] == 1
     assert second["created"] == 0 and second["updated"] == 1  # deduped, not duplicated
+
+
+# ----- Posted-date parsing + freshness filter -----
+
+def test_parse_posted_date_handles_all_source_formats():
+    from datetime import datetime
+    assert opp.parse_posted_date("2026-07-01") == datetime(2026, 7, 1)
+    assert opp.parse_posted_date("2026-07-01T10:30:00") == datetime(2026, 7, 1, 10, 30)
+    # tz-aware (Greenhouse/Jobicy) → normalized to naive UTC
+    assert opp.parse_posted_date("2026-07-01T10:30:00+02:00") == datetime(2026, 7, 1, 8, 30)
+    assert opp.parse_posted_date("2026-07-01T10:30:00Z") == datetime(2026, 7, 1, 10, 30)
+    # epoch seconds (Arbeitnow)
+    assert opp.parse_posted_date("1782588644").year == 2026
+    assert opp.parse_posted_date(None) is None
+    assert opp.parse_posted_date("") is None
+    assert opp.parse_posted_date("not a date") is None
+
+
+def test_posted_within_days_filters_old_and_undated(client):
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    payload = {"jobs": [
+        {"external_id": "fresh", "company": "Fresh Co", "title": "Junior Engineer",
+         "location": "Istanbul, Turkey", "description": "x",
+         "date_posted": now.isoformat()},
+        {"external_id": "stale", "company": "Stale Co", "title": "Junior Engineer",
+         "location": "Istanbul, Turkey", "description": "x",
+         "date_posted": (now - timedelta(days=45)).isoformat()},
+        {"external_id": "undated", "company": "Undated Co", "title": "Junior Engineer",
+         "location": "Istanbul, Turkey", "description": "x"},
+    ], "source": "manual-import"}
+    assert client.post("/opportunities/import", json=payload).json()["created"] == 3
+
+    week = client.get("/opportunities?posted_within_days=7").json()["items"]
+    assert [i["company"] for i in week] == ["Fresh Co"]
+    month3 = client.get("/opportunities?posted_within_days=90").json()["items"]
+    assert {i["company"] for i in month3} == {"Fresh Co", "Stale Co"}
+    all_items = client.get("/opportunities").json()["items"]
+    assert {i["company"] for i in all_items} >= {"Fresh Co", "Stale Co", "Undated Co"}
+
+
+def test_posted_within_days_validation(client):
+    assert client.get("/opportunities?posted_within_days=0").status_code == 422
+    assert client.get("/opportunities?posted_within_days=400").status_code == 422
+
+
+# ----- Seniority inference from the JD body (neutral titles) -----
+
+def test_neutral_title_new_grad_in_description():
+    rec = opp.normalize_record(
+        {"title": "Software Engineer", "company": "Acme",
+         "description": "We welcome new grad applicants who love backend work.",
+         "location": "Istanbul, Turkey"},
+        source="test", is_sample=False)
+    assert rec["seniority_level"] == "new_grad"
+
+
+def test_neutral_title_turkish_yeni_mezun_in_description():
+    rec = opp.normalize_record(
+        {"title": "Backend Developer", "company": "Acme",
+         "description": "Yeni mezun adaylarımızı bekliyoruz.",
+         "location": "Ankara, Turkey"},
+        source="test", is_sample=False)
+    assert rec["seniority_level"] == "new_grad"
+
+
+def test_senior_title_wins_over_description_signals():
+    rec = opp.normalize_record(
+        {"title": "Senior Software Engineer", "company": "Acme",
+         "description": "You will mentor new grad and junior engineers.",
+         "location": "Istanbul, Turkey"},
+        source="test", is_sample=False)
+    assert rec["seniority_level"] == "senior"
+
+
+def test_reclassify_stored_upgrades_legacy_rows(db_session):
+    from app.models import Opportunity
+    row = Opportunity(
+        source="legacy", external_id="legacy-1", company="Legacy Co",
+        title="Software Engineer", description="Perfect for a recent graduate.",
+        location="Istanbul, Turkey", remote_policy="hybrid",
+        seniority_level="unknown",
+        turkey_applicability_label=opp.LABEL_UNCLEAR,
+    )
+    db_session.add(row)
+    db_session.commit()
+    changed = opp.reclassify_stored(db_session)
+    assert changed == 1
+    assert row.seniority_level == "new_grad"
+    assert row.turkey_applicability_label == opp.LABEL_STRONG  # Turkey-based
+
+
+def test_entry_level_groups_new_grad_and_junior(client):
+    payload = {"jobs": [
+        {"external_id": "el-1", "company": "El Co", "title": "Software Engineer (New Grad)",
+         "location": "Istanbul, Turkey", "description": "x"},
+        {"external_id": "el-2", "company": "El Co", "title": "Junior Software Engineer",
+         "location": "Istanbul, Turkey", "description": "x"},
+        {"external_id": "el-3", "company": "El Co", "title": "Senior Software Engineer",
+         "location": "Istanbul, Turkey", "description": "x"},
+    ], "source": "manual-import"}
+    assert client.post("/opportunities/import", json=payload).json()["created"] == 3
+    items = client.get("/opportunities?seniority=entry_level&include_ineligible=true").json()["items"]
+    levels = {i["seniority_level"] for i in items if i["company"] == "El Co"}
+    assert levels == {"new_grad", "junior"}

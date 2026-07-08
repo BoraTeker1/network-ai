@@ -193,6 +193,7 @@ export type OpportunityFilters = {
   source?: string;
   confidence?: string;
   function?: string; // all|software_engineering|business|other|any
+  posted_within_days?: number; // 1|7|30|90 — freshness window
   include_ineligible?: boolean;
 };
 
@@ -623,6 +624,8 @@ export const api = {
     if (filters.source) params.set("source", filters.source);
     if (filters.confidence) params.set("confidence", filters.confidence);
     if (filters.function) params.set("function", filters.function);
+    if (filters.posted_within_days)
+      params.set("posted_within_days", String(filters.posted_within_days));
     if (filters.include_ineligible) params.set("include_ineligible", "true");
     const qs = params.toString();
     return request<OpportunitiesResponse>(`/opportunities${qs ? `?${qs}` : ""}`);

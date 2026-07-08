@@ -13,12 +13,15 @@ import { useT } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n/en";
 
 const REGIONS = ["", "turkey", "remote", "europe", "global"];
-// Level tabs keep new-grad and internship seekers in separate lanes.
-const LEVELS = ["", "new_grad", "internship", "junior"];
+// "entry_level" groups new-grad + junior (each applies to the other's roles);
+// internships stay a separate lane.
+const LEVELS = ["", "entry_level", "internship"];
 // Field tabs serve tech and business students separately (creative/admin hidden).
 const FIELDS = ["all", "software_engineering", "business"];
 const APPLICABILITY = ["", "strong", "possible", "unclear", "no"];
 const CONFIDENCE = ["", "official_ats", "public_api", "manual_curated", "sample_demo"];
+// Freshness windows in days ("" = any time).
+const POSTED = ["", "1", "7", "30", "90"];
 
 // Look up a filter value in a dict map, treating "" as "all".
 function label(map: Record<string, string>, key: string | null | undefined): string {
@@ -287,6 +290,18 @@ export default function OpportunitiesPage() {
           </select>
           <select className={select} value={filters.confidence ?? ""} onChange={(e) => setFilters((f) => ({ ...f, confidence: e.target.value || undefined }))}>
             {CONFIDENCE.map((c) => <option key={c} value={c}>{label(to.confidence, c)}</option>)}
+          </select>
+          <select
+            className={select}
+            value={filters.posted_within_days ? String(filters.posted_within_days) : ""}
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                posted_within_days: e.target.value ? Number(e.target.value) : undefined,
+              }))
+            }
+          >
+            {POSTED.map((p) => <option key={p} value={p}>{label(to.posted, p)}</option>)}
           </select>
           <button
             onClick={() => setRemoteOnly((v) => !v)}

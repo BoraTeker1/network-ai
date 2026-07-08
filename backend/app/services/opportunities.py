@@ -15,7 +15,7 @@ on first use). Public-API fetching is an explicit, separate, resilient action.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -142,7 +142,18 @@ _RELOCATION_TERMS = ("relocation", "visa sponsorship", "sponsor a visa",
 
 # ----- Inference helpers -----
 
-def _infer_seniority(title: str, explicit: str | None) -> str:
+# Description-level signals, consulted ONLY when the title is neutral. Kept to
+# unambiguous phrases (incl. Turkish) — prose like "work with senior engineers"
+# must not flip a label, so there is no senior detection from the body.
+_NEW_GRAD_TEXT_TERMS = ("new grad", "new-grad", "recent graduate", "fresh graduate",
+                        "yeni mezun", "üniversite son sınıf")
+_JUNIOR_TEXT_TERMS = ("entry level", "entry-level", "0-1 year", "0–1 year",
+                      "0-2 year", "0–2 year", "no prior experience",
+                      "no previous experience", "junior")
+_INTERN_TEXT_TERMS = ("internship", "intern position", "stajyer", "staj programı")
+
+
+def _infer_seniority(title: str, explicit: str | None, text: str = "") -> str:
     if explicit:
         e = explicit.lower().strip()
         if e in (_JUNIOR_LEVELS | _SENIOR_LEVELS | {"mid", "unknown"}):
@@ -158,6 +169,18 @@ def _infer_seniority(title: str, explicit: str | None) -> str:
         return "senior"
     if "mid" in t:
         return "mid"
+    # Neutral title (e.g. plain "Software Engineer") — look for explicit
+    # junior-friendly phrases in the JD body before giving up. Most sources
+    # put "new grad" / "yeni mezun" / "0-2 years" in the description, not the
+    # title, which starved the New grad / Junior tabs.
+    blob = (text or "").lower()
+    if blob:
+        if any(w in blob for w in _NEW_GRAD_TEXT_TERMS):
+            return "new_grad"
+        if any(w in blob for w in _INTERN_TEXT_TERMS):
+            return "internship"
+        if any(w in blob for w in _JUNIOR_TEXT_TERMS):
+            return "junior"
     return "unknown"
 
 
@@ -274,7 +297,7 @@ def normalize_record(raw: dict, *, source: str, is_sample: bool) -> dict:
             tags = [t.strip() for t in tags.split(",") if t.strip()]
     text = f"{description} {' '.join(tags)}"
 
-    seniority = _infer_seniority(title, raw.get("seniority_level"))
+    seniority = _infer_seniority(title, raw.get("seniority_level"), text)
     remote_policy = _infer_remote_policy(location, raw.get("remote_policy"), text)
     region = _infer_region(location, raw.get("target_region"), remote_policy, text)
     work_auth_note = raw.get("work_auth_note")
@@ -380,14 +403,23 @@ ARBEITNOW_URL = "https://www.arbeitnow.com/api/job-board-api"
 
 
 def fetch_arbeitnow(limit: int = 50) -> list[dict]:
-    """Fetch a page of public EU job-board listings. Network call lives ONLY here;
-    callers wrap it so a failure never breaks the seeded feed."""
+    """Fetch public EU job-board listings, paginating until `limit` is reached
+    (the API serves ~100 per page). Network call lives ONLY here; callers wrap
+    it so a failure never breaks the seeded feed."""
     import requests  # local import keeps the module importable/offline by default
 
-    resp = requests.get(ARBEITNOW_URL, timeout=15,
-                        headers={"User-Agent": "network-ai/0.1 (compliant feed)"})
-    resp.raise_for_status()
-    data = resp.json().get("data", [])[:limit]
+    data: list[dict] = []
+    page = 1
+    while len(data) < limit and page <= 5:
+        resp = requests.get(ARBEITNOW_URL, params={"page": page}, timeout=15,
+                            headers={"User-Agent": "network-ai/0.1 (compliant feed)"})
+        resp.raise_for_status()
+        batch = resp.json().get("data", [])
+        if not batch:
+            break
+        data.extend(batch)
+        page += 1
+    data = data[:limit]
     out = []
     for j in data:
         out.append({
@@ -405,7 +437,7 @@ def fetch_arbeitnow(limit: int = 50) -> list[dict]:
     return out
 
 
-def refresh_public_sources(db: Session, limit: int = 50) -> dict:
+def refresh_public_sources(db: Session, limit: int = 200) -> dict:
     """Fetch + store public remote/EU listings (Arbeitnow + Remotive + Jobicy —
     all keyless public APIs, no scraping). Resilient: each feed is independent, so
     one failing reports an error and the others (and the seeded feed) keep working.
@@ -431,7 +463,8 @@ def refresh_public_sources(db: Session, limit: int = 50) -> dict:
     except Exception as exc:
         errors.append(f"remotive: {type(exc).__name__}")
     try:
-        _store("jobicy", [_jobicy_to_record(j) for j in fetch_jobicy(count=limit)])
+        # Jobicy's public API caps `count` at 50 per request.
+        _store("jobicy", [_jobicy_to_record(j) for j in fetch_jobicy(count=min(limit, 50))])
     except Exception as exc:
         errors.append(f"jobicy: {type(exc).__name__}")
 
@@ -715,6 +748,11 @@ SOURCE_REGISTRY: list[dict] = [
      "country_scope": "Global", "company_category": "Cybersecurity", "priority": 2,
      "enabled": True, "source_confidence": "official_ats",
      "notes": "Verified live Lever board (Ankara HQ; some EU/US roles, filtered by applicability)."},
+    {"id": "goodjobgames", "company_name": "Good Job Games", "ats_provider": "greenhouse",
+     "board_token": "goodjobgames", "careers_url": "https://www.goodjobgames.com/career/",
+     "country_scope": "Turkey", "company_category": "Gaming", "priority": 2,
+     "enabled": True, "source_confidence": "official_ats",
+     "notes": "Verified live Greenhouse board (Istanbul/Sarıyer, all roles Turkey-located) — 2026-07-08."},
     {"id": "iyzico", "company_name": "iyzico", "ats_provider": "lever",
      "board_token": "iyzico", "careers_url": "https://jobs.lever.co/iyzico",
      "country_scope": "Turkey", "company_category": "Fintech", "priority": 2,
@@ -882,10 +920,44 @@ def refresh_source(db: Session, source_id: str) -> dict | None:
     return _refresh_one(db, src)
 
 
+def reclassify_stored(db: Session) -> int:
+    """Re-run seniority inference (and, when it changes, the applicability
+    label) over every stored row. Refreshing only overwrites rows still served
+    by their source, so classifier improvements would otherwise never reach
+    older/delisted rows. Returns how many rows changed."""
+    changed = 0
+    for row in db.query(Opportunity).all():
+        try:
+            raw = json.loads(row.raw_source_json or "{}")
+        except (ValueError, TypeError):
+            raw = {}
+        tags = _tags(row)
+        text = f"{row.description or ''} {' '.join(tags)}"
+        seniority = _infer_seniority(row.title or "", raw.get("seniority_level"), text)
+        if seniority == row.seniority_level:
+            continue
+        row.seniority_level = seniority
+        row.turkey_applicability_label, row.turkey_applicability_reason = (
+            classify_turkey_applicability(
+                title=row.title or "", description=row.description or "",
+                location=row.location or "", remote_policy=row.remote_policy or "unknown",
+                country_scope=row.country_scope, tags=tags,
+                work_auth_note=row.work_auth_note, seniority=seniority,
+                accepts_turkey_based=row.accepts_turkey_based,
+            )
+        )
+        changed += 1
+    if changed:
+        db.commit()
+    return changed
+
+
 def refresh_all(db: Session) -> dict:
     """Refresh everything in one action: official ATS sources (Lever/Greenhouse/
-    Ashby) AND public job APIs (Arbeitnow/Remotive/Jobicy). Each part is
-    independently resilient, so one failing source never breaks the others."""
+    Ashby) AND public job APIs (Arbeitnow/Remotive/Jobicy), then re-run the
+    classifier over stored rows so older listings pick up inference fixes.
+    Each part is independently resilient, so one failing source never breaks
+    the others."""
     ats = refresh_sources(db)
     public = refresh_public_sources(db)
     public_errors = public.get("errors", [])
@@ -897,6 +969,7 @@ def refresh_all(db: Session) -> dict:
         "errors": public_errors,
         "ats": ats,
         "public": public,
+        "reclassified": reclassify_stored(db),
         "total": db.query(Opportunity).count(),
     }
 
@@ -910,6 +983,38 @@ def refresh_turkish_sources(db: Session) -> dict:
 
 
 # ----- Filtering + ranking + serialization -----
+
+def parse_posted_date(raw) -> datetime | None:
+    """Best-effort parse of the raw `date_posted` string into naive UTC.
+
+    Sources disagree on format: Arbeitnow stores epoch seconds, Lever a bare
+    date, Greenhouse/Remotive/Jobicy ISO datetimes with or without an offset.
+    Unparseable/missing values return None (treated as "date unknown")."""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    if s.isdigit():  # epoch seconds (Arbeitnow)
+        try:
+            return datetime.utcfromtimestamp(int(s))
+        except (ValueError, OverflowError, OSError):
+            return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _posted_within(row: Opportunity, days: int) -> bool:
+    posted = parse_posted_date(row.date_posted)
+    if posted is None:
+        return False  # a freshness filter should never surface undated roles
+    return posted >= datetime.utcnow() - timedelta(days=days)
+
 
 def _tags(row: Opportunity) -> list[str]:
     try:
@@ -1019,7 +1124,8 @@ def serialize(row: Opportunity, profile_skills=None) -> dict:
 def list_opportunities(
     db: Session, *, region=None, seniority=None, remote_only=False,
     applicability=None, tag=None, source=None, confidence=None, function=None,
-    include_ineligible=False, profile_skills=None, limit=100,
+    posted_within_days=None, include_ineligible=False, profile_skills=None,
+    limit=100,
 ) -> list[dict]:
     q = db.query(Opportunity)
     # Real users must never mistake the demo seed for real roles: once any real
@@ -1035,7 +1141,12 @@ def list_opportunities(
     if region:
         q = q.filter(Opportunity.target_region == region)
     if seniority:
-        q = q.filter(Opportunity.seniority_level == seniority)
+        # "entry_level" groups new-grad + junior: in practice each applies to the
+        # other's roles, and the split made the feed look emptier than it is.
+        if seniority == "entry_level":
+            q = q.filter(Opportunity.seniority_level.in_(("new_grad", "junior")))
+        else:
+            q = q.filter(Opportunity.seniority_level == seniority)
     if remote_only:
         q = q.filter(Opportunity.remote_policy == "remote")
     if applicability and applicability in APPLICABILITY_KEYS:
@@ -1053,6 +1164,10 @@ def list_opportunities(
     if tag:
         tl = tag.lower()
         rows = [r for r in rows if any(tl == t.lower() for t in _tags(r))]
+    # Freshness filter (Python-side: date_posted is a raw string with
+    # per-source formats — see parse_posted_date).
+    if posted_within_days:
+        rows = [r for r in rows if _posted_within(r, posted_within_days)]
     # Function filter (computed lazily so legacy rows filter too):
     #   "all" (default) → engineering + business, hides creative/admin "other"
     #   "software_engineering" / "business" / "other" → exactly that bucket

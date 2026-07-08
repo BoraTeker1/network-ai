@@ -38,13 +38,14 @@ def list_opportunities(
     db: Session = Depends(get_db),
     user: User | None = Depends(optional_user),
     region: str | None = Query(None),
-    seniority: str | None = Query(None),
+    seniority: str | None = Query(None),  # exact level, or "entry_level" = new_grad+junior
     remote: bool = Query(False),
     applicability: str | None = Query(None),
     tag: str | None = Query(None),
     source: str | None = Query(None),          # filters by source provider
     confidence: str | None = Query(None),
     function: str = Query("all"),  # all|software_engineering|business|other|any
+    posted_within_days: int | None = Query(None, ge=1, le=365),
     include_ineligible: bool = Query(False),
     limit: int = Query(100, ge=1, le=300),
 ):
@@ -57,7 +58,8 @@ def list_opportunities(
     items = opportunities.list_opportunities(
         db, region=region, seniority=seniority, remote_only=remote,
         applicability=applicability, tag=tag, source=source, confidence=confidence,
-        function=function, include_ineligible=include_ineligible,
+        function=function, posted_within_days=posted_within_days,
+        include_ineligible=include_ineligible,
         profile_skills=_profile_skills(db, user), limit=limit,
     )
     if user is not None:
@@ -122,7 +124,7 @@ def import_opportunities(payload: OpportunityImportIn, db: Session = Depends(get
 
 
 @router.post("/refresh-public-sources")
-def refresh_public_sources(db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=100), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
+def refresh_public_sources(db: Session = Depends(get_db), limit: int = Query(200, ge=1, le=500), _rl: None = Depends(rate_limit("opps_refresh")), _user: User = Depends(require_user)):
     """Fetch + store public job-board listings (Arbeitnow, no key). Resilient:
     on failure it reports the error and leaves the seeded feed intact."""
     return opportunities.refresh_public_sources(db, limit=limit)
