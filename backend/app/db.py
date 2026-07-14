@@ -86,6 +86,15 @@ def run_lightweight_migrations() -> None:
             "is_closed": "ALTER TABLE jobs ADD COLUMN is_closed BOOLEAN DEFAULT 0",
             "discovered_at": "ALTER TABLE jobs ADD COLUMN discovered_at DATETIME",
         },
+        # Job-search preferences + resume provenance on the user's profile.
+        "profiles": {
+            "seniority": "ALTER TABLE profiles ADD COLUMN seniority VARCHAR",
+            "preferred_locations": "ALTER TABLE profiles ADD COLUMN preferred_locations TEXT",
+            "work_models": "ALTER TABLE profiles ADD COLUMN work_models TEXT",
+            "priorities": "ALTER TABLE profiles ADD COLUMN priorities TEXT",
+            "resume_filename": "ALTER TABLE profiles ADD COLUMN resume_filename VARCHAR",
+            "resume_updated_at": "ALTER TABLE profiles ADD COLUMN resume_updated_at DATETIME",
+        },
         # Source provenance for the curated opportunity feed.
         "opportunities": {
             "source_provider": "ALTER TABLE opportunities ADD COLUMN source_provider VARCHAR",

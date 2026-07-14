@@ -518,6 +518,102 @@ export const en = {
     noneDetected: "None detected",
     expSummary: "Experience Summary",
     targetRoles: "Target Roles",
+
+    // Header save state
+    allSaved: "All changes saved",
+    unsaved: "Unsaved changes",
+    discard: "Discard",
+
+    // Identity + strength hero
+    strength: "Profile strength",
+    strengthInfo:
+      "How complete your profile is. Each section makes role ranking and outreach drafts sharper.",
+    stepsLeft: (n: number) => (n === 1 ? "1 step left" : `${n} steps left`),
+    allComplete: "Everything's filled in",
+    completeProfile: "Complete profile",
+    noHeadline: "Add a target role",
+    noLocations: "No preferred locations yet",
+
+    // Tabs
+    tabGoals: "Goals",
+    tabSkills: "Skills",
+    tabExperience: "Experience",
+    tabPreferences: "Preferences",
+
+    // Goals tab
+    goalsTitle: "Career goals",
+    goalsHint: "These shape role ranking and your outreach tone.",
+    rolesInfo: "Roles you want. We rank the feed against these first.",
+    addRoleBtn: "Add role",
+    seniorityLabel: "Seniority",
+    seniorityInfo: "The stage you're hiring-ready for. Filters out roles you'd be screened out of.",
+    seniorityNewGrad: "New grad / Junior",
+    seniorityIntern: "Internship",
+    seniorityMid: "Mid-level",
+    locationsLabel: "Preferred locations",
+    locationsInfo: "Where you'd work from — a city, “Remote”, or a region like “Europe”.",
+    addLocationBtn: "Add location",
+    workModelLabel: "Work model",
+    workModelInfo: "Pick every model you'd accept.",
+    workRemote: "Remote",
+    workHybrid: "Hybrid",
+    workOffice: "Office",
+    prioritiesLabel: "Priorities",
+    prioritiesInfo: "Drag or use the arrows — what's at the top wins when a role forces a trade-off.",
+    priorityVisa: "Visa / work eligibility",
+    priorityTechFit: "Technical fit",
+    priorityCompanyQuality: "Company quality",
+    moveUp: "Move up",
+    moveDown: "Move down",
+
+    // Experience tab
+    experienceTitle: "Experience",
+    experienceHint: "One honest paragraph. It's quoted in your outreach drafts.",
+    educationLabel: "Education",
+
+    // Preferences tab
+    prefsTitle: "App preferences",
+    langLabel: "Interface language",
+    langHint: "Applies across the app. Outreach drafts can still be written in either language.",
+
+    // Skills card
+    skillsInfo: "Parsed from your CV. Edit freely — these drive role matching.",
+    editSkills: "Edit skills",
+    addSkillBtn: "Add skill",
+    noSkillsYet: "No skills yet. Upload a CV or add them by hand.",
+
+    // Right rail — readiness
+    readinessTitle: "Match readiness",
+    readyCv: "CV uploaded",
+    missingCv: "CV not uploaded",
+    readyRoles: "Target roles selected",
+    missingRoles: "Target roles missing",
+    readySkills: "Skills added",
+    missingSkills: "Skills missing",
+    readySummary: "Experience summary written",
+    missingSummary: "Experience summary missing",
+    readyPrefs: "Preferences set",
+    missingPrefs: "Preferences incomplete",
+    completeMissing: "Complete what's missing",
+
+    // Right rail — impact
+    impactTitle: "What does this profile affect?",
+    impactRanking: "Role ranking",
+    impactRankingDesc:
+      "Your goals and skills push the best-matching roles to the top of the feed.",
+    impactEligibility: "Turkey-applicability verdict",
+    impactEligibilityDesc:
+      "Work eligibility, location and language make it easier to match you with roles you can actually apply to.",
+    impactOutreach: "Outreach personalization",
+    impactOutreachDesc:
+      "Your priorities and experience make outreach messages more relevant.",
+
+    // Right rail — last CV
+    lastCvTitle: "Last CV update",
+    lastCvPasted: "Pasted text",
+    lastCvNone: "No CV uploaded yet.",
+    lastCvNoneCta: "Upload your CV",
+    lastCvUpdate: "Update CV",
   },
   emails: {
     title: "Email approval queue",

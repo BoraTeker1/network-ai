@@ -4,6 +4,16 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
+// Job-search preferences. These literals mirror the backend enums exactly —
+// the API rejects anything else with a 422.
+export type Seniority = "intern" | "new_grad" | "mid";
+export type WorkModel = "remote" | "hybrid" | "office";
+export type PriorityKey = "visa" | "tech_fit" | "company_quality";
+
+export const SENIORITY_LEVELS: Seniority[] = ["new_grad", "intern", "mid"];
+export const WORK_MODELS: WorkModel[] = ["remote", "hybrid", "office"];
+export const PRIORITY_KEYS: PriorityKey[] = ["visa", "tech_fit", "company_quality"];
+
 export type Profile = {
   id: number;
   user_id: string;
@@ -11,7 +21,26 @@ export type Profile = {
   education: string | null;
   experience_summary: string | null;
   target_roles: string[];
+  seniority: Seniority | null;
+  preferred_locations: string[];
+  work_models: WorkModel[];
+  /** Ranked, index 0 = top priority. */
+  priorities: PriorityKey[];
+  has_resume: boolean;
+  resume_filename: string | null;
+  resume_updated_at: string | null;
   created_at: string | null;
+};
+
+/** Every editable field on the profile. All optional — omitted = left untouched. */
+export type ProfileEdit = {
+  skills?: string[];
+  target_roles?: string[];
+  experience_summary?: string;
+  seniority?: Seniority;
+  preferred_locations?: string[];
+  work_models?: WorkModel[];
+  priorities?: PriorityKey[];
 };
 
 export type ChecklistItem = {
@@ -545,11 +574,7 @@ export const api = {
 
   // Profile
   getProfile: () => request<Profile>("/profile"),
-  updateProfile: (fields: {
-    skills?: string[];
-    target_roles?: string[];
-    experience_summary?: string;
-  }) =>
+  updateProfile: (fields: ProfileEdit) =>
     request<Profile>("/profile", {
       method: "PUT",
       body: JSON.stringify(fields),

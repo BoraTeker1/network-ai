@@ -520,6 +520,104 @@ export const tr: Dict = {
     noneDetected: "Tespit edilmedi",
     expSummary: "Deneyim Özeti",
     targetRoles: "Hedef Roller",
+
+    // Başlıktaki kayıt durumu
+    allSaved: "Tüm değişiklikler kaydedildi",
+    unsaved: "Kaydedilmemiş değişiklikler",
+    discard: "Vazgeç",
+
+    // Kimlik + profil gücü
+    strength: "Profil gücü",
+    strengthInfo:
+      "Profilinizin ne kadar dolu olduğu. Her bölüm rol sıralamasını ve outreach taslaklarını keskinleştirir.",
+    stepsLeft: (n: number) => `${n} adım daha tamamla`,
+    allComplete: "Her şey tamam",
+    completeProfile: "Profili tamamla",
+    noHeadline: "Bir hedef rol ekleyin",
+    noLocations: "Henüz tercih edilen konum yok",
+
+    // Sekmeler
+    tabGoals: "Hedefler",
+    tabSkills: "Beceriler",
+    tabExperience: "Deneyim",
+    tabPreferences: "Tercihler",
+
+    // Hedefler sekmesi
+    goalsTitle: "Kariyer hedefleri",
+    goalsHint: "Bu bilgiler rol sıralamasını ve outreach tonunu belirler.",
+    rolesInfo: "İstediğiniz roller. Akışı önce bunlara göre sıralarız.",
+    addRoleBtn: "Rol ekle",
+    seniorityLabel: "Kıdem seviyesi",
+    seniorityInfo: "Hazır olduğunuz seviye. Elenebileceğiniz rolleri ayıklar.",
+    seniorityNewGrad: "Yeni mezun / Junior",
+    seniorityIntern: "Staj",
+    seniorityMid: "Mid-level",
+    locationsLabel: "Tercih edilen konumlar",
+    locationsInfo: "Nereden çalışırsınız — bir şehir, “Remote” ya da “Avrupa” gibi bir bölge.",
+    addLocationBtn: "Konum ekle",
+    workModelLabel: "Çalışma modeli",
+    workModelInfo: "Kabul edeceğiniz tüm modelleri seçin.",
+    workRemote: "Remote",
+    workHybrid: "Hibrit",
+    workOffice: "Ofis",
+    prioritiesLabel: "Öncelikler",
+    prioritiesInfo:
+      "Oklarla sıralayın — bir rol ödün vermeyi gerektirdiğinde en üstteki kazanır.",
+    priorityVisa: "Vize / çalışma uygunluğu",
+    priorityTechFit: "Teknik uyum",
+    priorityCompanyQuality: "Şirket kalitesi",
+    moveUp: "Yukarı taşı",
+    moveDown: "Aşağı taşı",
+
+    // Deneyim sekmesi
+    experienceTitle: "Deneyim",
+    experienceHint: "Dürüst tek bir paragraf. Outreach taslaklarınızda alıntılanır.",
+    educationLabel: "Eğitim",
+
+    // Tercihler sekmesi
+    prefsTitle: "Uygulama tercihleri",
+    langLabel: "Arayüz dili",
+    langHint:
+      "Tüm uygulamada geçerlidir. Outreach taslaklarını yine iki dilde de yazabilirsiniz.",
+
+    // Beceriler kartı
+    skillsInfo: "CV'nizden çıkarıldı. Serbestçe düzenleyin — rol eşleşmesini bunlar besler.",
+    editSkills: "Becerileri düzenle",
+    addSkillBtn: "Beceri ekle",
+    noSkillsYet: "Henüz beceri yok. CV yükleyin ya da elle ekleyin.",
+
+    // Sağ panel — hazırlık
+    readinessTitle: "Eşleşme hazırlığı",
+    readyCv: "CV yüklendi",
+    missingCv: "CV yüklenmedi",
+    readyRoles: "Hedef roller seçildi",
+    missingRoles: "Hedef roller eksik",
+    readySkills: "Beceriler eklendi",
+    missingSkills: "Beceriler eksik",
+    readySummary: "Deneyim özeti yazıldı",
+    missingSummary: "Deneyim özeti eksik",
+    readyPrefs: "Tercihler ayarlandı",
+    missingPrefs: "Tercihler eksik",
+    completeMissing: "Eksikleri tamamla",
+
+    // Sağ panel — etki
+    impactTitle: "Bu profil neyi etkiler?",
+    impactRanking: "Rol sıralaması",
+    impactRankingDesc:
+      "Hedeflerin ve becerilerin, sana en uygun işlerin üst sırada görünmesini sağlar.",
+    impactEligibility: "Türkiye uygunluk değerlendirmesi",
+    impactEligibilityDesc:
+      "Çalışma izni, konum ve dil bilgilerin uygun fırsatlarla eşleşmeni kolaylaştırır.",
+    impactOutreach: "Outreach kişiselleştirmesi",
+    impactOutreachDesc:
+      "Tercihlerin ve deneyimin, outreach mesajlarının daha ilgili olmasını sağlar.",
+
+    // Sağ panel — son CV
+    lastCvTitle: "Son CV güncellemesi",
+    lastCvPasted: "Yapıştırılan metin",
+    lastCvNone: "Henüz CV yüklenmedi.",
+    lastCvNoneCta: "CV'nizi yükleyin",
+    lastCvUpdate: "CV'yi güncelle",
   },
   emails: {
     title: "E-posta onay kuyruğu",

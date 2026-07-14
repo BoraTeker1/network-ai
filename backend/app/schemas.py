@@ -5,7 +5,7 @@ edge (422) instead of reaching parsers, the DB, or an LLM prompt.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -42,12 +42,22 @@ class ProfileCreate(BaseModel):
     raw_resume: str = Field(max_length=MAX_RESUME_CHARS)
 
 
+Seniority = Literal["intern", "new_grad", "mid"]
+WorkModel = Literal["remote", "hybrid", "office"]
+PriorityKey = Literal["visa", "tech_fit", "company_quality"]
+
+
 class ProfileUpdateIn(BaseModel):
     """Partial edit of the structured profile (parsed fields stay user-editable).
     Omitted fields are left untouched."""
     skills: Optional[List[str]] = Field(None, max_length=60)
     target_roles: Optional[List[str]] = Field(None, max_length=20)
     experience_summary: Optional[str] = Field(None, max_length=2000)
+    # Preferences. Unknown values are rejected as 422 rather than silently stored.
+    seniority: Optional[Seniority] = None
+    preferred_locations: Optional[List[str]] = Field(None, max_length=20)
+    work_models: Optional[List[WorkModel]] = Field(None, max_length=3)
+    priorities: Optional[List[PriorityKey]] = Field(None, max_length=3)
 
 
 class ProfileOut(BaseModel):
@@ -57,6 +67,14 @@ class ProfileOut(BaseModel):
     education: Optional[str] = None
     experience_summary: Optional[str] = None
     target_roles: Optional[List[str]] = None
+    seniority: Optional[Seniority] = None
+    preferred_locations: Optional[List[str]] = None
+    work_models: Optional[List[WorkModel]] = None
+    priorities: Optional[List[PriorityKey]] = None
+    # Resume provenance. The raw text is never returned — only whether it exists.
+    has_resume: bool = False
+    resume_filename: Optional[str] = None
+    resume_updated_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:

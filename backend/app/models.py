@@ -102,6 +102,28 @@ FOLLOW_UP_STATUSES = (
     "no_response",
 )
 
+# Career stage the user is hunting at. Drives which roles rank as realistic.
+SENIORITY_LEVELS = (
+    "intern",
+    "new_grad",
+    "mid",
+)
+
+# Where the user is willing to work from.
+WORK_MODELS = (
+    "remote",
+    "hybrid",
+    "office",
+)
+
+# What the user optimizes for, stored as a ranked list (index 0 = top priority).
+PRIORITY_KEYS = (
+    "visa",
+    "tech_fit",
+    "company_quality",
+)
+
+
 class Profile(Base):
     __tablename__ = "profiles"
 
@@ -114,6 +136,17 @@ class Profile(Base):
     education = Column(Text, nullable=True)
     experience_summary = Column(Text, nullable=True)
     target_roles = Column(Text, nullable=True)      # JSON list of strings
+
+    # Job-search preferences. These feed role ranking, the Turkey-applicability
+    # verdict, and outreach framing, so they are user-owned — never parsed.
+    seniority = Column(String, nullable=True)            # one of SENIORITY_LEVELS
+    preferred_locations = Column(Text, nullable=True)    # JSON list of strings
+    work_models = Column(Text, nullable=True)            # JSON list of WORK_MODELS
+    priorities = Column(Text, nullable=True)             # JSON list of PRIORITY_KEYS, ranked
+
+    # Provenance of the last resume import, for the "last CV update" card.
+    resume_filename = Column(String, nullable=True)  # None when pasted as text
+    resume_updated_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
