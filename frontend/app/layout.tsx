@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
+import AppShell from "@/components/AppShell";
 import AuthProvider, { RouteGuard } from "@/components/AuthProvider";
 import { LanguageProvider } from "@/lib/i18n";
 
@@ -21,11 +20,9 @@ export default function RootLayout({
       <body>
         <LanguageProvider>
           <AuthProvider>
-            <Nav />
-            <main className="mx-auto max-w-5xl px-6 py-8">
+            <AppShell>
               <RouteGuard>{children}</RouteGuard>
-            </main>
-            <Footer />
+            </AppShell>
           </AuthProvider>
         </LanguageProvider>
       </body>

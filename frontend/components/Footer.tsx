@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n";
 export default function Footer() {
   const t = useT();
   return (
-    <footer className="mx-auto max-w-5xl px-6 pb-8 text-center text-xs text-slate-400">
+    <footer className="px-6 pb-8 text-center text-xs text-slate-400">
       {t.footer.beta}{" "}
       <a
         href="mailto:tekerbora@gmail.com?subject=Network%20AI%20feedback"
