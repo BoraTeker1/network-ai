@@ -5,8 +5,8 @@ resume into a structured skill profile, and ranks every stored job against that 
 a deterministic, explainable scorer.
 
 The scoring deliberately makes no LLM calls. Every point a job receives is attributable to a
-rule, so the same resume and the same job always produce the same score — and the API
-returns the reasoning, not just the number.
+rule, so the same resume and the same job always produce the same score. The API
+returns the reasoning behind it as well as the number itself.
 
 ## Stack
 
@@ -25,7 +25,7 @@ SimplifyJobs README ──► job_ingestion ─┼──► matcher ──► Jo
 **Ingestion** (`services/job_ingestion.py`) pulls the
 [SimplifyJobs/New-Grad-Positions](https://github.com/SimplifyJobs/New-Grad-Positions) README
 and parses it. The postings live in HTML `<table>` rows rather than Markdown tables, and a
-company cell of `↳` means "same company as the row above" — so the parser carries the last
+company cell of `↳` means "same company as the row above", so the parser carries the last
 company forward, strips decorative markers, unescapes entities, and pulls the first `href`
 as the real application URL. Rows without a company, role, or link are skipped rather than
 stored half-empty.
@@ -109,9 +109,9 @@ scaffolding, and the code says so rather than pretending otherwise:
 - **No authentication.** Every record belongs to a single hardcoded `DEMO_USER_ID`.
 - **No tests yet.** `job_ingestion.parse_jobs` and `matcher.score_job` are both pure
   functions over their inputs, which is where testing should start.
-- **`create_all` on startup, not migrations** — fine for local development, would need
+- **`create_all` on startup, not migrations.** Fine for local development, would need
   Alembic before anything real.
 
 The intended next slice is drafting outreach messages for high-scoring matches, with every
 draft requiring manual approval before use. Contact discovery is scoped to generating
-LinkedIn/Google search links — no scraping and no automated sending.
+LinkedIn/Google search links, with no scraping and no automated sending.
